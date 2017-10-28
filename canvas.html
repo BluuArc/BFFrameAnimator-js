@@ -86,7 +86,7 @@
                 try{
                     $.get(path,function(data){
                         let csv = data.split('\n').map((line) => {
-                            return line.split(',').map(d => +d);
+                            return line.split(',');
                         })
                         fulfill(csv);
                     })
@@ -112,8 +112,8 @@
                         cgg.part_count = +frame[1];
                         cgg.frame_data = [];
 
-                        let curIndex = 2
-                        while(curIndex < data.length){
+                        let curIndex = 2, part_count = 0;
+                        while(curIndex < data.length && part_count < cgg.part_count){
                             let frameInfo = {};
                             frameInfo.position = { //origin is middle
                                 x: +frame[curIndex++],
@@ -130,7 +130,19 @@
                                 height: +frame[curIndex++],
                             },
                             frameInfo.page_id = +frame[curIndex++];
-                            cgg.frame_data.push(frameInfo);
+
+                            let isValid = true;
+                            for(let f in frameInfo){
+                                if(f !== "position" && f !== "img" && isNaN(frameInfo[f])){
+                                    isValid = false;
+                                }
+                            }
+                            if(isValid){
+                                part_count++;
+                                cgg.frame_data.push(frameInfo);
+                            }else{
+                                console.log("NaN issue with",frameInfo,cgg);
+                            }
                         }
                         animationInfo.cgg.push(cgg);
                     }
@@ -176,49 +188,36 @@
             let actualFrames = []; //frames to draw
 
             //analyze bounds - to refactor
-            let xMin,yMin,xMax,yMax,wMin,wMax,hMin,hMax;
+            let xMin,yMin,xMax,yMax;//,wMin,wMax,hMin,hMax;
             for(let i of animInfo){
                 let frameData = cggData[i.frame_index];
                 actualFrames.push(frameData);
                 for(let f of frameData.frame_data){
+                    let w = f.img.width,h = f.img.height;
                     //set mins
                     !isNaN(xMin) ? (xMin = Math.min(xMin,f.position.x)) : (xMin = f.position.x);
                     !isNaN(yMin) ? (yMin = Math.min(yMin,f.position.y)) : (yMin = f.position.y);
-                    !isNaN(wMin) ? (wMin = Math.min(wMin,f.img.width)) : (wMin = f.img.width);
-                    !isNaN(hMin) ? (hMin = Math.min(hMin,f.img.height)) : (hMin = f.img.height);
+
 
                     //set max
-                    !isNaN(xMax) ? (xMax = Math.max(xMax,f.position.x)) : (xMax = f.position.x);
-                    !isNaN(yMax) ? (yMax = Math.max(yMax,f.position.y)) : (yMax = f.position.y);
-                    !isNaN(wMax) ? (wMax = Math.max(wMax,f.img.width)) : (wMax = f.img.width);
-                    !isNaN(hMax) ? (hMax = Math.max(hMax,f.img.height)) : (hMax = f.img.height);
+                    !isNaN(xMax) ? (xMax = Math.max(xMax,f.position.x + w)) : (xMax = f.position.x + w);
+                    !isNaN(yMax) ? (yMax = Math.max(yMax,f.position.y + h)) : (yMax = f.position.y + h);
 
                 }
 
             }
             //store bounds
-            const bounds = {
+            const frameBounds = {
                 x: [xMin,xMax],
                 y: [yMin,yMax],
-                w: [wMin,wMax],
-                h: [hMin,hMax],
-                frame: {
-                    x: [xMin, xMax + wMax],
-                    y: [yMin, yMax + hMax]
-                }
-            };
-
-            const frameBounds = {
-                x: [Math.min(xMin, xMax - wMax), xMax + wMax],
-                y: [Math.min(yMin, yMax - hMax), yMax + hMax],
-                w: xMax + wMax - Math.min(xMin, xMax - wMax),
-                h: yMax + hMax - Math.min(yMin, yMax - hMax),
+                w: xMax - xMin,
+                h: yMax - yMin,
                 offset: {//add to move sprite to right/bottom, add half to center
-                    x: xMax - Math.min(xMin, xMax - wMax), 
-                    y: yMax - Math.min(yMin, yMax - hMax)
+                    x: 0, 
+                    y: yMax - yMin
                 }
             };
-            console.log(bounds)
+            console.log(frameBounds);
 
             d3.select("#frameContainer").selectAll('canvas')
                 .data(actualFrames).enter().append('canvas')
@@ -243,7 +242,7 @@
                 context.drawImage(
                     sourceSheet,
                     f.img.x,f.img.y,w,h,
-                    f.position.x + origin.x + frameBounds.offset.x/2, f.position.y + origin.y + frameBounds.offset.y,w,h
+                    f.position.x + origin.x + frameBounds.offset.x/2, f.position.y + origin.y + frameBounds.offset.y*0.45,w,h
                 );
             }
 
