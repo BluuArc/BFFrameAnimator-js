@@ -80,9 +80,6 @@
 
         function loadCSV(path){
             return new Promise((fulfill,reject) => {
-                // d3.csv(path,(err,data) => {
-                //     err ? reject(err) : fulfill(data);
-                // });
                 try{
                     $.get(path,function(data){
                         let csv = data.split('\n').map((line) => {
