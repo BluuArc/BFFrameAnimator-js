@@ -24,6 +24,10 @@
         .component .row {
             margin: 0;
         }
+
+        .hidden {
+            display: none;
+        }
     </style>
 </head>
 
@@ -38,7 +42,7 @@
             </div>
         </div>
 
-        <div class="component">
+        <div class="component hidden">
             <div class="row">
                 <h1 class="col text-center">Frame Parts</h1>
             </div>
@@ -53,6 +57,19 @@
             <div class="row justify-content-center" id="frameContainer">
             </div>
         </div>
+
+        <div class="component" id="animation">
+            <div class="row">
+                <h1 class="col text-center">Animation</h1>
+            </div>
+            <div class="row">
+                <div class="btn-group" role="group" aria-label="Animation Button Group">
+
+                </div>
+            </div>
+            <div class="row justify-content-center" id="animationContainer">
+            </div>
+        </div>
     </div>
 
 
@@ -63,18 +80,64 @@
         crossorigin="anonymous"></script>
     <script src="https://d3js.org/d3.v4.min.js"></script>
     <script src="frame-maker.js"></script>
+    <script src="frame-animator.js"></script>
     <script>
         let unitInfo = {
-            id: '860127',
-            server: 'gl'
+            id: '51317',
+            server: 'jp'
         };
-        FrameMaker.init({
-            frame: "#frameContainer",
-            parts: "#partContainer",
-            sheet: "#sheetContainer"
+
+        $(document).ready(() => {
+            FrameMaker.init({
+                frame: "#frameContainer",
+                parts: "#partContainer",
+                sheet: "#sheetContainer"
+            });
+            FrameAnimator.init({
+                animationContainer: "#animationContainer"
+            });
+
+            FrameMaker.createAnimation(unitInfo)
+                .then(() => {
+                    const animTypes = FrameMaker.getAnimationTypes();
+
+                    // create buttons
+                    let btnGroup = d3.select("#animation .btn-group");
+                    btnGroup.selectAll("*").remove();
+                    btnGroup.selectAll("button").data(animTypes)
+                        .enter().append('button')
+                        .text((d,i) => d)
+                        .on("click",function(d,i){
+                            let sampleFrame = FrameMaker.getFrame(d,0);
+                            let d3Frame = d3.select(sampleFrame);
+                            FrameAnimator.stop();
+                            requestAnimationFrame(() => {
+                                FrameAnimator.setCanvasDimensions(sampleFrame.width,sampleFrame.height);
+                                FrameAnimator.setAnimationState({
+                                    framesUntilIncrement: +d3Frame.attr('delay'),
+                                    frameIndex: 0,
+                                    speed: 1,
+                                    type: d
+                                });
+
+                                FrameAnimator.play(function(animationState){
+                                    if(animationState.framesUntilIncrement > 0){
+                                        return FrameMaker.getFrame(animationState.type,animationState.frameIndex);
+                                    }else{
+                                        let frame = FrameMaker.getFrame(animationState.type, ++animationState.frameIndex);
+                                        if(!frame){
+                                            animationState.frameIndex = 0;
+                                            frame = FrameMaker.getFrame(animationState.type, animationState.frameIndex);
+                                        }
+                                        animationState.framesUntilIncrement = +d3.select(frame).attr('delay');
+                                        return frame;
+                                    }
+                                });
+                            });
+                        });
+                })
         })
-        FrameMaker.createAnimation(unitInfo);
-    </script>
+        </script>
 </body>
 
 </html>

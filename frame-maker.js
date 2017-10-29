@@ -235,6 +235,7 @@ let FrameMaker = (function(){
     //need animInfo for bounds checking
     function drawFrames(spritesheets,cggData,animInfo,targetContainer,animType){
         targetContainer.selectAll('canvas').remove();
+        self.frames[animType] = [];
 
         let drawFrame = function(frameData,targetCanvas,sourceSheets,frameBounds, drawIntermediate){
             const origin = {
@@ -247,12 +248,12 @@ let FrameMaker = (function(){
             // for (let i = frameData.frame_data.length - 1; i >= 0; --i) {
             for (let i = frameData.frame_data.length - 1; i >= 0 ; --i) {
                 let f = frameData.frame_data[i]; //draw in reverse order
-                // console.log(f);
-                // context.globalCompositeOperation = 'destination-over';
                 let tempContext = tempCanvas.getContext('2d');
-                const w = f.img.width, h = f.img.height
+                const w = f.img.width, h = f.img.height;
+
                 tempContext.clearRect(0,0,tempCanvas.width,tempCanvas.height);
                 tempContext.globalAlpha = f.opacity/100;
+
                 let flipX = f.next_type == 1 || f.next_type == 3;
                 let flipY = f.next_type == 2 || f.next_type == 3;
                 if(flipX || flipY || f.rotate !== 0){
@@ -269,14 +270,46 @@ let FrameMaker = (function(){
                         f.img.x, f.img.y, w, h,
                         0, 0, w, h
                     );
+
                     if (f.rotate !== 0) {
+                        pContext.rotate(f.rotate * Math.PI / 180);
                         console.log(f.rotate, partCanvas.node());
                     }
+                    
+                    let startX = f.position.x + origin.x + frameBounds.offset.x,
+                        startY = f.position.y + origin.y + frameBounds.offset.y,
+                        rotationOffsetX = 0, rotationOffsetY = 0, isLandscape = w > h;
+                    if (f.rotate !== 0) {
+                        tempContext.translate(startX + (w / 2), startY + (h / 2));
+                        tempContext.rotate(-f.rotate * Math.PI / 180);
+                        tempContext.translate(-(startX + (w / 2)), -(startY + (h / 2)));
+                        console.log(f.rotate, partCanvas.node());
+
+                        let angle = f.rotate;
+                        while(angle < 0){
+                            angle += 360;
+                        }
+
+                        if(angle === 90 || angle === 270){
+                            rotationOffsetY -= isLandscape ? h : 0;
+                            rotationOffsetX -= !isLandscape ? w : 0;
+                                
+                        }
+
+                    }
+                    
                     tempContext.drawImage(
                         partCanvas.node(),
                         0, 0, w, h,
-                        f.position.x + origin.x + frameBounds.offset.x, f.position.y + origin.y + frameBounds.offset.y, w, h
+                        startX + rotationOffsetX, startY + rotationOffsetY, w, h
                     );
+
+                    if (f.rotate !== 0) {
+                        tempContext.translate(startX + (w / 2), startY + (h / 2));
+                        tempContext.rotate(f.rotate * Math.PI / 180);
+                        tempContext.translate(-(startX + (w / 2)), -(startY + (h / 2)));
+                        // console.log(f.rotate, partCanvas.node());
+                    }
                 }else{
                     tempContext.drawImage(
                         sourceSheets[f.page_id],
@@ -330,8 +363,8 @@ let FrameMaker = (function(){
             for (let f of frameData.frame_data) {
                 let w = f.img.width, h = f.img.height;
                 //set mins
-                !isNaN(xMin) ? (xMin = Math.min(xMin, f.position.x)) : (xMin = f.position.x);
-                !isNaN(yMin) ? (yMin = Math.min(yMin, f.position.y - h)) : (yMin = f.position.y - h);
+                !isNaN(xMin) ? (xMin = Math.min(xMin, f.position.x - w)) : (xMin = f.position.x - w);
+                !isNaN(yMin) ? (yMin = Math.min(yMin, f.position.y - ((animType === "atk") ? h : 0))) : (yMin = f.position.y - ((animType === "atk") ? h : 0));
 
                 //set max
                 !isNaN(xMax) ? (xMax = Math.max(xMax, f.position.x + w)) : (xMax = f.position.x + w);
@@ -346,7 +379,7 @@ let FrameMaker = (function(){
             h: yMax - yMin,
             offset: {//add to move sprite to right/bottom, add half to center - use as needed
                 x: animType === "atk" ? (xMax - xMin)*0.125 : 0,
-                y: (yMax - yMin)*0.40
+                y: animType === "atk" ? (yMax-yMin)*0.20 : (yMax - yMin)*0.40
             }
         };
 
@@ -361,7 +394,11 @@ let FrameMaker = (function(){
             .data(actualFrames).enter().append('canvas')
             .attr('width', frameBounds.w).attr('height', frameBounds.h)
             .attr('id', (d,i) => { return "frame" + i; })
-            .each((data,index,domArray) => drawFrame(data,domArray[index],spritesheets,frameBounds));
+            .attr('delay', (d,i) => { return animInfo[i].frame_delay; })
+            .each((data,index,domArray) => {
+                drawFrame(data,domArray[index],spritesheets,frameBounds);
+                self.frames[animType].push(domArray[index]);
+            });
     }
 
     function createAnimation(unitInfo){
@@ -377,13 +414,11 @@ let FrameMaker = (function(){
             if(unitInfo.animation.anime){
                 loadImg = loadSpritesheets(unitInfo.animation.anime);
             }else{
-                const sheetUrl = `${prefixUrl}${filepaths.anime}/unit_anime_${unitInfo.id}.png`;
+                const sheetUrl = `${prefixUrl}${filepaths.anime}unit_anime_${unitInfo.id}.png`;
                 loadImg = loadSpritesheets([sheetUrl]);
             }
-
-            //load cgg and cgs
             
-            loadImg.then(() => {
+            return loadImg.then(() => {
                 console.log("Loading animation files");
                 return loadAnimationData(unitInfo);
             }).then((animationData) => {
@@ -399,21 +434,27 @@ let FrameMaker = (function(){
 
                     drawFrames(sheetArr,animationData.cgg,animationData.cgs[animType],animContainer,animType);
                 }
-            })
+                return;
+            });
         }
     }
 
     function getFrame(type,number){
-
+        return self.frames[type][number];
     }
 
     function getNumFrames(type){
+        return self.frames[type].length;
+    }
 
+    function getAnimationTypes(){
+        return Object.keys(self.frames);
     }
 
     public_data.init = init;
     public_data.createAnimation = createAnimation;
     public_data.getFrame = getFrame;
     public_data.getNumFrames = getNumFrames;
+    public_data.getAnimationTypes = getAnimationTypes;
     return public_data;
 })();
