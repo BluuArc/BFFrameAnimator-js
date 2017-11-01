@@ -244,6 +244,11 @@ let FrameMaker = (function(){
             };
             let context = targetCanvas.getContext('2d');
             let tempCanvas = self.components.parts.select("#temp" + animType).node();
+
+            if(self.bgColor){
+                context.fillStyle = self.bgColor;
+                context.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            }
             
             // for (let i = frameData.frame_data.length - 1; i >= 0; --i) {
             for (let i = frameData.frame_data.length - 1; i >= 0 ; --i) {
@@ -407,7 +412,7 @@ let FrameMaker = (function(){
         }
         if(isValidUnitInfo(unitInfo)){
             const prefixUrl = servers[unitInfo.server];
-
+            self.bgColor = unitInfo.bgColor;
             //load sprite sheet
             let loadImg;
             console.log("Loading sprite sheets");

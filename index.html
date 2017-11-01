@@ -32,7 +32,76 @@
 </head>
 
 <body>
-    <div class="container">
+    
+
+    <div class="container" id="sheetSection">
+        <div class="component" id="input">
+            <div class="row">
+                <form class="col-sm-12 col-md-6">
+                    <div class="form-group">
+                        <label for="idInput">Unit ID: </label>
+                        <input type="number" id="idInput" name="idInput" placeholder="e.g. 10011">
+                    </div>
+                    <div class="form-group">
+                        <label for="serverInput">Server: </label>
+                        <div class="form-check">
+                            <label class="form-check-label">
+                                <input class="form-check-input" type="radio" name="serverInput" value="gl" checked>
+                                Global
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <label class="form-check-label">
+                                <input class="form-check-input" type="radio" name="serverInput" value="jp">
+                                Japan
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <label class="form-check-label">
+                                <input class="form-check-input" type="radio" name="serverInput" value="eu">
+                                Europe
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="bgOption">Background Color: </label>
+                        <input list="colors" name="bgOption" id="bgOption" placeholder="#F00 or red works" aria-describedby="bgHelpBlock">
+                        <datalist id="colors">
+                            <option value="white"></option>
+                            <option value="black"></option>
+                        </datalist>
+                        <small id="bgHelpBlock" class="form-text text-muted">
+                            Leave blank to have a transparent background. <code>white</code> or <code>black</code> works based for exporting to GIF.
+                        </small>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Generate</button>
+                </form>
+                <div class="col-sm-12 col-md-6 align-middle text-center">
+                    <span id="formResult">Enter an ID</span>
+                </div>
+            </div>
+            
+        </div>
+        <div class="component" id="animation">
+            <div class="row">
+                <h1 class="col text-center">Animation</h1>
+            </div>
+            <div class="row">
+                <div class="btn-group" role="group" aria-label="Animation Button Group" id="animTypeGroup">
+
+                </div>
+            </div>
+            <div class="row justify-content-center" id="animationContainer">
+            </div>
+            <div class="row">
+                <div class="btn-group" role="group" aria-label="Animation State Group" id="animStateGroup">
+                    <button type="button" class="btn btn-secondary" id="play" disabled>Play</button>
+                    <button type="button" class="btn btn-secondary" id="stop" disabled>Stop</button>
+                    <button type="button" class="btn btn-secondary" id="createGif" disabled>Generate GIF</button>
+                </div>
+            </div>
+        </div>
+
         <div class="component">
             <div class="row">
                 <h1 class="col text-center">Sprite Sheet</h1>
@@ -42,7 +111,7 @@
             </div>
         </div>
 
-        <div class="component hidden">
+        <div class="component hidden" id="partSection">
             <div class="row">
                 <h1 class="col text-center">Frame Parts</h1>
             </div>
@@ -50,7 +119,7 @@
             </div>
         </div>
 
-        <div class="component">
+        <div class="component hidden" id="frameSection">
             <div class="row">
                 <h1 class="col text-center">Finished Frames</h1>
             </div>
@@ -58,18 +127,7 @@
             </div>
         </div>
 
-        <div class="component" id="animation">
-            <div class="row">
-                <h1 class="col text-center">Animation</h1>
-            </div>
-            <div class="row">
-                <div class="btn-group" role="group" aria-label="Animation Button Group">
-
-                </div>
-            </div>
-            <div class="row justify-content-center" id="animationContainer">
-            </div>
-        </div>
+        
     </div>
 
 
@@ -79,38 +137,81 @@
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js" integrity="sha384-alpBpkh1PFOepccYVYDB4do5UnbKysX5WZXm3XxPqe5iKTfUKjNkCk9SaVuEZflJ"
         crossorigin="anonymous"></script>
     <script src="https://d3js.org/d3.v4.min.js"></script>
-    <script src="frame-maker.js"></script>
-    <script src="frame-animator.js"></script>
+    <script src="js/gif.js"></script>
+    <script src="js/frame-maker.js"></script>
+    <script src="js/frame-animator.js"></script>
     <script>
-        let unitInfo = {
-            id: '51317',
-            server: 'jp'
-        };
+        let activeType, useTransparency;
+        function formLog(msg){
+            $("#formResult").html(msg);
+        }
 
-        $(document).ready(() => {
-            FrameMaker.init({
-                frame: "#frameContainer",
-                parts: "#partContainer",
-                sheet: "#sheetContainer"
-            });
-            FrameAnimator.init({
-                animationContainer: "#animationContainer"
+        function createGif(){
+            if(!activeType){
+                formLog("Please select an animation first");
+                return;
+            }
+
+            $("#animStateGroup #createGif").prop("disabled",true);
+
+            let gifOptions = {
+                // background: 'rgba(0,0,0,0)',
+                workerScript: 'js/gif.worker.js',
+                copy: true,
+                quality: 1
+            };
+            if(useTransparency){
+                gifOptions.transparent = 'rgba(0,0,0,0)';
+            }
+
+            //based off of https://github.com/jnordberg/gif.js/issues/52
+            // and https://github.com/jnordberg/gif.js
+            let gif = new GIF(gifOptions);
+
+            let i = 0, curFrame = FrameMaker.getFrame(activeType, i);
+            while(curFrame !== undefined){
+                gif.addFrame(curFrame, { delay: Math.floor(+$(curFrame).attr("delay")/60 * 1000) });
+                curFrame = FrameMaker.getFrame(activeType, ++i);
+            }
+
+            console.log("Creating GIF",gif);
+            
+            gif.on('finished', function(blob){
+                console.log("done making GIF");
+                $("#animStateGroup #createGif").prop("disabled",false);
+                window.open(URL.createObjectURL(blob));
             });
 
-            FrameMaker.createAnimation(unitInfo)
+            gif.render();
+            
+        }
+        
+
+        function generateAnimation(options){
+            FrameAnimator.togglePlayState(false);
+
+            d3.selectAll("#frameContainer").selectAll("canvas").remove();
+            d3.selectAll("#partContainer").selectAll("canvas").remove();
+
+            FrameMaker.createAnimation(options)
                 .then(() => {
                     const animTypes = FrameMaker.getAnimationTypes();
 
-                    // create buttons
-                    let btnGroup = d3.select("#animation .btn-group");
+                    $("#animStateGroup #play").prop("disabled",false);
+                    $("#animStateGroup #stop").prop("disabled",false);
+                    $("#animStateGroup #createGif").prop("disabled",false);
+
+                    // create animation buttons
+                    let btnGroup = d3.select("#animation #animTypeGroup");
                     btnGroup.selectAll("*").remove();
                     btnGroup.selectAll("button").data(animTypes)
                         .enter().append('button')
-                        .text((d,i) => d)
+                        .text((d,i) => d).classed("btn btn-primary", true)
                         .on("click",function(d,i){
+                            activeType = d;
                             let sampleFrame = FrameMaker.getFrame(d,0);
                             let d3Frame = d3.select(sampleFrame);
-                            FrameAnimator.stop();
+                            FrameAnimator.togglePlayState(false);
                             requestAnimationFrame(() => {
                                 FrameAnimator.setCanvasDimensions(sampleFrame.width,sampleFrame.height);
                                 FrameAnimator.setAnimationState({
@@ -135,7 +236,46 @@
                                 });
                             });
                         });
+                    formLog("<b class='text-success'>Finished!</b> Click " + animTypes.join(" or ") + " in the 'Animation' box to play the animation");
                 })
+        }
+
+        $(document).ready(() => {
+            FrameMaker.init({
+                frame: "#frameContainer",
+                parts: "#partContainer",
+                sheet: "#sheetContainer",
+                errorHandler: formLog
+            });
+            FrameAnimator.init({
+                animationContainer: "#animationContainer",
+                playButton: "#animStateGroup #play",
+                stopButton: "#animStateGroup #stop"
+            });
+
+            $("form button[type=submit]").on("click",function(e){
+                e.preventDefault();
+                let unitInfo = {
+                    id: $("form #idInput").val(),
+                    server: $("form input[name=serverInput][checked]").val(),
+                    bgColor: $("form input#bgOption").val()
+                };
+                useTransparency = unitInfo.bgColor.length === 0;
+                console.log(unitInfo);
+
+                if(isNaN(unitInfo.id) || unitInfo.id.toString().length < 5){
+                    formLog("Please enter an 5 digit or higher unit ID");
+                    return;
+                }
+
+               
+                formLog("Generating Animation");
+                $("#animStateGroup #createGif").prop("disabled",true);
+                generateAnimation(unitInfo);
+                
+            });
+
+            $("button#createGif").on("click", createGif);
         })
         </script>
 </body>

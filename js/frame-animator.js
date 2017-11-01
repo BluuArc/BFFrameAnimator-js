@@ -9,13 +9,17 @@ let FrameAnimator = (function(){
             frameIndex: 0,
             isPlaying: false,
             speed: 1,
-        }
+        },
+        getFrameFn: () => console.log("No frame function specified")
     };
     let public_data = {};
 
     function init(options){
         self.animatingCanvas = d3.select(options.animationContainer)
             .append('canvas').attr('id','animatingCanvas').node();
+
+        d3.select(options.playButton).on("click", () => togglePlayState(true));
+        d3.select(options.stopButton).on("click", () => togglePlayState(false));
     }
 
     function draw(getFrameFn){
@@ -40,6 +44,7 @@ let FrameAnimator = (function(){
 
     function play(getFrameFn){
         if(!self.animationState.isPlaying){
+            self.getFrameFn = getFrameFn;
             self.animationState.isPlaying = true;
             requestAnimationFrame(() => {
                 draw(getFrameFn);
@@ -47,8 +52,12 @@ let FrameAnimator = (function(){
         }
     }
 
-    function stop(){
-        self.animationState.isPlaying = false;
+    function togglePlayState(state){
+        if(!self.animationState.isPlaying && state == true){
+            play(self.getFrameFn);
+        }else{
+            self.animationState.isPlaying = state == true;
+        }
     }
 
     function setAnimationState(newState){
@@ -60,7 +69,7 @@ let FrameAnimator = (function(){
     public_data.init = init;
     public_data.setCanvasDimensions = setCanvasDimensions;
     public_data.play = play;
-    public_data.stop = stop;
+    public_data.togglePlayState = togglePlayState;
     public_data.setAnimationState = setAnimationState;
     return public_data;
 })();
