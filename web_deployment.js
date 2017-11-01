@@ -15,6 +15,7 @@ var argv = require('yargs')
     .alias('h', 'help')
     .argv;
 
+app.set('port', (process.env.PORT || 5000));
 app.use(express.static(__dirname));
 
 app.get('/get/:url',function(req,res){
@@ -56,6 +57,6 @@ app.get('/', function (req,res) {
     res.sendFile("index.html").end();
 });
 
-var server = app.listen(argv.port, function () {
+var server = app.listen(app.get('port'), function () {
     console.log("Listening on " + this.address().address + ":" + this.address().port);
 });
