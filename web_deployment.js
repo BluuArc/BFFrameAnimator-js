@@ -56,6 +56,6 @@ app.get('/', function (req,res) {
     res.sendFile("index.html").end();
 });
 
-var server = app.listen(argv.port, argv.ip, function () {
+var server = app.listen(argv.port, function () {
     console.log("Listening on " + this.address().address + ":" + this.address().port);
 });
