@@ -98,6 +98,7 @@
                     <button type="button" class="btn btn-secondary" id="play" disabled>Play</button>
                     <button type="button" class="btn btn-secondary" id="stop" disabled>Stop</button>
                     <button type="button" class="btn btn-secondary" id="createGif" disabled>Generate GIF</button>
+                    <a href="" target="_blank" id="downloadLink">Download GIF</a>
                 </div>
             </div>
         </div>
@@ -153,6 +154,7 @@
             }
 
             $("#animStateGroup #createGif").prop("disabled",true);
+            $("#downloadLink").hide();
 
             let gifOptions = {
                 // background: 'rgba(0,0,0,0)',
@@ -179,7 +181,9 @@
             gif.on('finished', function(blob){
                 console.log("done making GIF");
                 $("#animStateGroup #createGif").prop("disabled",false);
-                window.open(URL.createObjectURL(blob));
+                $("#downloadLink").attr('href',URL.createObjectURL(blob))
+                    .show();
+                // window.open(URL.createObjectURL(blob));
             });
 
             gif.render();
@@ -252,6 +256,8 @@
                 playButton: "#animStateGroup #play",
                 stopButton: "#animStateGroup #stop"
             });
+
+            $("#downloadLink").hide();
 
             $("form button[type=submit]").on("click",function(e){
                 e.preventDefault();
