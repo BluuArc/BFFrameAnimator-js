@@ -257,7 +257,7 @@
                 e.preventDefault();
                 let unitInfo = {
                     id: $("form #idInput").val(),
-                    server: $("form input[name=serverInput][checked]").val(),
+                    server: $("form input[name=serverInput]:checked").val(),
                     bgColor: $("form input#bgOption").val()
                 };
                 useTransparency = unitInfo.bgColor.length === 0;
