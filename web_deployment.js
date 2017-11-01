@@ -49,7 +49,11 @@ app.get('/getImage/:url',function(req,res){
     //     }).catch((err) => {
     //         res.send(err).end();
     //     });
-})
+});
+
+app.get('/', function (req,res) {
+    res.sendFile("index.html").end();
+});
 
 var server = app.listen(argv.port, argv.ip, function () {
     console.log("Listening on " + this.address().address + ":" + this.address().port);
