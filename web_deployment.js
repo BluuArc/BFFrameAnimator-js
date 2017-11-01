@@ -52,6 +52,7 @@ app.get('/getImage/:url',function(req,res){
 });
 
 app.get('/', function (req,res) {
+    console.log("Sending index.html");
     res.sendFile("index.html").end();
 });
 
