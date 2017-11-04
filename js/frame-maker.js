@@ -112,7 +112,7 @@ let FrameMaker = (function(){
 
         self.components.sheet.selectAll('img').remove();
 
-        console.log(sheetArr);
+        // console.log(sheetArr);
 
         let loadPromises = [];
         self.components.sheet.selectAll('img')
@@ -250,7 +250,6 @@ let FrameMaker = (function(){
                 context.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
             }
             
-            // for (let i = frameData.frame_data.length - 1; i >= 0; --i) {
             for (let i = frameData.frame_data.length - 1; i >= 0 ; --i) {
                 let f = frameData.frame_data[i]; //draw in reverse order
                 let tempContext = tempCanvas.getContext('2d');
@@ -278,7 +277,7 @@ let FrameMaker = (function(){
 
                     if (f.rotate !== 0) {
                         pContext.rotate(f.rotate * Math.PI / 180);
-                        console.log(f.rotate, partCanvas.node());
+                        // console.log(f.rotate, partCanvas.node());
                     }
                     
                     let startX = f.position.x + origin.x + frameBounds.offset.x,
@@ -288,7 +287,7 @@ let FrameMaker = (function(){
                         tempContext.translate(startX + (w / 2), startY + (h / 2));
                         tempContext.rotate(-f.rotate * Math.PI / 180);
                         tempContext.translate(-(startX + (w / 2)), -(startY + (h / 2)));
-                        console.log(f.rotate, partCanvas.node());
+                        // console.log(f.rotate, partCanvas.node());
 
                         let angle = f.rotate;
                         while(angle < 0){
@@ -364,6 +363,9 @@ let FrameMaker = (function(){
         let xMin, yMin, xMax, yMax;
         for (let i of animInfo) {
             let frameData = cggData[i.frame_index];
+            if(i.x_pos_offset != 0 || i.y_pos_offset != 0){
+                console.log(i.x_pos_offset, i.y_pos_offset, i);
+            }
             actualFrames.push(frameData);
             for (let f of frameData.frame_data) {
                 let w = f.img.width, h = f.img.height;
@@ -423,12 +425,17 @@ let FrameMaker = (function(){
                 loadImg = loadSpritesheets([sheetUrl]);
             }
             
-            return loadImg.then(() => {
+            return loadImg.catch((err) => {
+                console.error("Error loading spritesheet", err);
+                throw "SpritesheetLoad";
+            }).then(() => {
                 console.log("Loading animation files");
-                return loadAnimationData(unitInfo);
+                return loadAnimationData(unitInfo)
+                    // .catch((err) => {})
             }).then((animationData) => {
                 console.log("Drawing Frames");
                 let sheetArr = [];
+                self.frames = {};
                 self.components.sheet.selectAll('img')
                     .each(function(){
                         sheetArr.push(this);

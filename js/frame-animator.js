@@ -22,17 +22,19 @@ let FrameAnimator = (function(){
         d3.select(options.stopButton).on("click", () => togglePlayState(false));
     }
 
-    function draw(getFrameFn){
+    function draw(getFrameFn, postUpdateFn = () => {}){
         let context = self.animatingCanvas.getContext('2d');
         context.clearRect(0,0,self.animatingCanvas.width,self.animatingCanvas.height);
 
         let img = getFrameFn(self.animationState);
         context.drawImage(img,0,0);
 
+        postUpdateFn(self.animatingCanvas);
+
         if(self.animationState.isPlaying){
             self.animationState.framesUntilIncrement--;
             requestAnimationFrame(() => {
-                draw(getFrameFn);
+                draw(getFrameFn, postUpdateFn);
             });
         }
     }
@@ -42,19 +44,30 @@ let FrameAnimator = (function(){
             .attr('width',w).attr('height',h);
     }
 
-    function play(getFrameFn){
+    function clear() {
+        if(self.animatingCanvas){
+            self.animatingCanvas.getContext('2d').clearRect(0,0,self.animatingCanvas.width,self.animatingCanvas.height);
+        }
+    }
+
+    function play(getFrameFn,postUpdateFn){
         if(!self.animationState.isPlaying){
             self.getFrameFn = getFrameFn;
+            self.postUpdateFn = postUpdateFn;
             self.animationState.isPlaying = true;
             requestAnimationFrame(() => {
-                draw(getFrameFn);
+                draw(getFrameFn, postUpdateFn);
             });
         }
     }
 
+    function getCurrentFrameIndex() {
+        return self.animationState.frameIndex;
+    }
+
     function togglePlayState(state){
         if(!self.animationState.isPlaying && state == true){
-            play(self.getFrameFn);
+            play(self.getFrameFn, self.postUpdateFn);
         }else{
             self.animationState.isPlaying = state == true;
         }
@@ -71,5 +84,7 @@ let FrameAnimator = (function(){
     public_data.play = play;
     public_data.togglePlayState = togglePlayState;
     public_data.setAnimationState = setAnimationState;
+    public_data.getCurrentFrameIndex = getCurrentFrameIndex;
+    public_data.clear = clear;
     return public_data;
 })();
