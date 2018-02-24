@@ -1,6 +1,7 @@
 function App() {
   const self = {
     frameMaker: new FrameMaker(),
+    frameAnimator: new FrameAnimator(),
     animationContainer: null,
     generateFramesBtn: null,
     form: null,
@@ -12,11 +13,16 @@ function App() {
     self.animationContainer = $("#animation-container");
     self.generateFramesBtn = $("button#generate-frames-btn");
     self.form = $("#animation-options");
-
+    
+    self.frameAnimator.setStageCanvas(self.animationContainer.find('canvas#stage').get(0));
+    
     self.generateFramesBtn.on('click', () => {
       self.unitInfo = null;
+      self.frameAnimator.pause(false);
       generateFrames();
     });
+
+    console.info('Ready!');
   }
 
   function setUnitInfo(info) {
@@ -196,8 +202,10 @@ function App() {
   function isBasicInfoValid(basicInfo = {}) {
     const validServers = ['gl', 'eu', 'jp'];
     if (!basicInfo.id || basicInfo.id.length === 0 || isNaN(basicInfo.id)) {
+      console.error('Invalid ID', basicInfo.id);
       return false;
     } else if (!basicInfo.server || validServers.indexOf(basicInfo.server) === -1) {
+      console.error('Invalid Server', basicInfo.server);
       return false;
     }
 
@@ -207,11 +215,13 @@ function App() {
   function getUnitInfoFromForm() {
     const basicInfo = {
       id: self.form.find("#unit-id input").val().trim(),
-      server: self.form.find("#server-selection input[checked='checked']").val()
+      server: self.form.find("#server-selection input:checked").val()
     };
 
+    console.debug({basicInfo});
+
     if (!isBasicInfoValid(basicInfo)) {
-      console.error("Basic info isn't valid.", basicInfo);
+      throw Error("Basic info isn't valid");
     } else {
       self.unitInfo = generateUrls(basicInfo);
     }
@@ -257,11 +267,30 @@ function App() {
     return animationUrls;
   }
 
+  function isUnitInfoValid(unitInfo = {}) {
+    if (!unitInfo.anime || !Array.isArray(unitInfo.anime) || unitInfo.anime.length === 0) {
+      console.error('Invalid spritesheet field', unitInfo.anime);
+      return false;
+    } else if (!unitInfo.cgg) {
+      console.error('Invalid cgg field', unitInfo.cgg);
+      return false;
+    } else if (!unitInfo.cgs || Object.keys(unitInfo.cgs).length === 0) {
+      console.error('Invalid cgs field', unitInfo.cgs);
+      return false;
+    }
+
+    return true;
+  }
+
   function generateFrames() {
     if (!self.unitInfo) {
       getUnitInfoFromForm();
     }
     console.debug(self.unitInfo);
+
+    if (!isUnitInfoValid(self.unitInfo)) {
+      throw Error('Unit info isn\'t valid');
+    }
 
     return getAnimationInfo(self.unitInfo)
       .then(animationInfo => {
@@ -275,6 +304,8 @@ function App() {
 
         console.info("Finished rendering frames");
         self.frameMaker.debug();
+
+        playFrames('atk');
       })
   }
 
@@ -282,11 +313,42 @@ function App() {
     return self.frameMaker;
   }
 
+  function getFrameAnimatorInstance() {
+    return self.frameAnimator;
+  }
+
+  function playFrames(animType) {
+    const frames = self.frameMaker.getFrames(animType);
+    const sampleFrame = frames[0];
+
+    console.debug({ sampleFrame });
+
+    self.frameAnimator.setCanvasDimensions(sampleFrame.width, sampleFrame.height);
+    self.frameAnimator.setAnimationState({
+      framesUntilRedraw: sampleFrame.$frameMakerData.delay,
+      currentFrameIndex: 0,
+      frames: frames,
+      lastKnownDelay: sampleFrame.$frameMakerData.delay,
+      isPlaying: false,
+      speed: 1
+    });
+
+    self.frameAnimator.setCallbackFunctions({
+      onAnimStart: (state) => console.debug('started!', state),
+      // afterRedraw: (state) => console.debug('drew frame', state.frameIndex, state),
+      onAnimEnd: (state) => console.debug('ended!', state)
+    })
+
+    self.frameAnimator.play();
+  }
+
   return {
     init,
     setUnitInfo,
     getUnitInfo,
     generateFrames,
-    getFrameMakerInstance
+    getFrameMakerInstance,
+    getFrameAnimatorInstance,
+    playFrames
   };
 }
