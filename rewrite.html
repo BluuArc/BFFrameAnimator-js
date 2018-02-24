@@ -4,12 +4,17 @@
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <title>BFDBReader-js</title>
     <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.7/semantic.min.css">
+    <style>
+      #stage-container {
+        text-align: center;
+      }
+    </style>
   </head>
   <body>
 
     <div class="ui container">
       <div class="ui segments">
-        <div class="ui segment" id="animation-options">
+        <div class="ui segment form" id="animation-options">
           <div class="ui header">Options</div>
           <div class="ui labeled input" id="unit-id">
             <div class="ui label">Unit ID:</div>
@@ -43,11 +48,11 @@
               <option value="white"></option>
               <option value="black"></option>
             </datalist>
-            <small id="bg-option">
-              Leave blank to have a transparent background.
-              <code>white</code> or
-              <code>black</code> works based for exporting to GIF.
-            </small>
+          </div>
+          <div id="bg-option">
+            Leave blank to have a transparent background.
+            <code>white</code> or
+            <code>black</code> works based for exporting to GIF.
           </div>
           <button class="ui blue button" id="generate-frames-btn">
             Generate
@@ -58,7 +63,28 @@
       <div class="ui segments" id="animation-container">
         <div class="ui segment">
           <div class="ui header">Animation</div>
-          <canvas id="stage"></canvas>
+          <div class="ui buttons attached" id="animation-type">
+            <button class="ui button">test</button>
+          </div>
+          <div id="stage-container" class="ui center attached">
+            <canvas id="stage"></canvas>
+          </div>
+          <div class="ui buttons attached" id="controls">
+            <button class="ui icon button" id="play">
+              <i class="play icon"></i>
+            </button>
+            <button class="ui icon button" id="pause">
+              <i class="pause icon"></i>
+            </button>
+            <button class="ui button" id="generate">
+              Generate GIF
+            </button>
+            <a class="ui button" id="download">
+              Download GIF
+            </a>
+          </div>
+        </div>
+        <div class="ui segment">
         </div>
       </div>
     </div>

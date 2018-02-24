@@ -3,6 +3,8 @@ function App() {
     frameMaker: new FrameMaker(),
     frameAnimator: new FrameAnimator(),
     animationContainer: null,
+    controlBtns: null,
+    typeBtns: null,
     generateFramesBtn: null,
     form: null,
     unitInfo: null
@@ -11,6 +13,8 @@ function App() {
 
   function init() {
     self.animationContainer = $("#animation-container");
+    self.controlBtns = self.animationContainer.find("#controls");
+    self.typeBtns = self.animationContainer.find("#animation-type");
     self.generateFramesBtn = $("button#generate-frames-btn");
     self.form = $("#animation-options");
     
@@ -21,6 +25,13 @@ function App() {
       self.frameAnimator.pause(false);
       generateFrames();
     });
+
+    self.controlBtns.find("#play").on('click', self.frameAnimator.play);
+    self.controlBtns.find("#pause").on('click', self.frameAnimator.pause);
+    self.controlBtns.find('#download').hide();
+
+    self.controlBtns.hide();
+    self.typeBtns.hide();
 
     console.info('Ready!');
   }
@@ -318,7 +329,26 @@ function App() {
         console.info("Finished rendering frames");
         self.frameMaker.debug();
 
-        playFrames('atk');
+        // add buttons
+        self.typeBtns.find(".ui.button").remove();
+        for (const type in animationInfo.sheetFrameData.cgs) {
+          const button = $(document.createElement('button'));
+          button.addClass('ui button');
+          button.text(type);
+
+          button.on('click', () => {
+            self.frameAnimator.pause();
+
+            requestAnimationFrame(() => playFrames(type));
+          });
+          self.typeBtns.append(button);
+        }
+
+        self.typeBtns.show();
+        self.controlBtns.show();
+
+        // play first animation by default
+        playFrames(Object.keys(animationInfo.sheetFrameData.cgs)[0]);
       })
   }
 
