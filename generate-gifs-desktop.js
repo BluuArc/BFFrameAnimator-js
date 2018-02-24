@@ -93,51 +93,6 @@ async function getAnimations(unitInfo) {
   console.log('Finished getting animations for', unitInfo.id);
 }
 
-async function sandbox() {
-  const browser = await puppeteer.launch({ headless: true });
-  const page = await browser.newPage();
-  await page.goto('http://localhost:5000');
-
-  // Get the "viewport" of the page, as reported by the page.
-  const result = await page.evaluate(() => {
-    let unitInfo = {
-      anime: ["http://bf-prod-dlc-gumi-sg.akamaized.net/content/monster/img/unit_anime_87515244.png"],
-      cgg: "http://bf-prod-dlc-gumi-sg.akamaized.net/content/monster/cgg/unit_cgg_87515244.csv",
-      cgs: {
-        "idle": "http://bf-prod-dlc-gumi-sg.akamaized.net/content/monster/cgs/unit_idle_cgs_87515244.csv",
-        "atk": "http://bf-prod-dlc-gumi-sg.akamaized.net/content/monster/cgs/unit_atk_cgs_87515244.csv"
-      }
-    };
-
-    myApp.setUnitInfo(unitInfo);
-
-    return myApp.generateFrames(unitInfo)
-      .then(() => {
-        myApp.getFrameAnimatorInstance().pause();
-        return myApp.createGif('atk');
-      });
-  });
-
-  console.log('Result:', result.blob);
-
-  await base64BlobToGIF(result.blob);
-
-  // let data = rp.get(result.link);
-  // console.log({data});
-
-  await browser.close();
-}
-
-const unitInfo = {
-  id: '87515244',
-  anime: ["http://bf-prod-dlc-gumi-sg.akamaized.net/content/monster/img/unit_anime_87515244.png"],
-  cgg: "http://bf-prod-dlc-gumi-sg.akamaized.net/content/monster/cgg/unit_cgg_87515244.csv",
-  cgs: {
-    "idle": "http://bf-prod-dlc-gumi-sg.akamaized.net/content/monster/cgs/unit_idle_cgs_87515244.csv",
-    "atk": "http://bf-prod-dlc-gumi-sg.akamaized.net/content/monster/cgs/unit_atk_cgs_87515244.csv"
-  }
-};
-
 async function createMultipleGifs(units = []) {
   const unitsToGenerate = units.slice();
   const errors = [];
