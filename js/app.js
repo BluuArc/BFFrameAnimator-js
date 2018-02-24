@@ -28,6 +28,7 @@ function App() {
 
     self.controlBtns.find("#play").on('click', self.frameAnimator.play);
     self.controlBtns.find("#pause").on('click', self.frameAnimator.pause);
+    self.controlBtns.find("#generate").on('click', () => createGif());
     self.controlBtns.find('#download').hide();
 
     self.controlBtns.hide();
@@ -339,6 +340,9 @@ function App() {
           button.on('click', () => {
             self.frameAnimator.pause();
 
+            self.controlBtns.find('#download').hide();
+            self.controlBtns.find('#generate').show();
+
             requestAnimationFrame(() => playFrames(type));
           });
           self.typeBtns.append(button);
@@ -366,6 +370,8 @@ function App() {
 
     console.debug({ sampleFrame });
 
+    self.animationContainer.find('canvas#stage').attr('anim-type', animType);
+
     self.frameAnimator.setCanvasDimensions(sampleFrame.width, sampleFrame.height);
     self.frameAnimator.setAnimationState({
       framesUntilRedraw: sampleFrame.$frameMakerData.delay,
@@ -385,6 +391,55 @@ function App() {
     self.frameAnimator.play();
   }
 
+  function createGif(type, useTransparency) {
+    return new Promise((fulfill, reject) => {
+      if (!type) {
+        type = self.animationContainer.find('canvas#stage').attr('anim-type');
+      }
+
+      if (!type) {
+        throw Error("No type defined for GIF");
+      }
+
+      self.controlBtns.find('#generate').prop('disabled', true);
+      self.controlBtns.find('#download').prop('disabled', true).hide();
+      const frames = self.frameMaker.getFrames(type);
+      const gifOptions = {
+        workerScript: 'js/gif.worker.js',
+        copy: true,
+        quality: 1,
+        transparent: useTransparency ? 'rgba(0,0,0,0)' : undefined
+      };
+
+      //based off of https://github.com/jnordberg/gif.js/issues/52
+      // and https://github.com/jnordberg/gif.js
+      const gif = new GIF(gifOptions);
+      frames.forEach(frame => {
+        const delay = frame.$frameMakerData.delay;
+        gif.addFrame(frame, { delay: Math.floor(delay / 60 * 1000) })
+      });
+
+      console.info('Creating GIF');
+      console.debug(gif);
+
+      gif.on('progress', amt => {
+        console.debug('GIF progress', (amt*100).toFixed(2));
+      });
+
+      gif.on('finished', (blob) => {
+        console.info('Done creating GIF');
+        console.debug({blob});
+        self.controlBtns.find('#generate').prop('disabled', false).hide();
+        self.controlBtns.find('#download').attr('href', URL.createObjectURL(blob))
+          .show();
+
+        fulfill(blob, URL.createObjectURL(blob));
+      });
+
+      gif.render();
+    });
+  }
+
   return {
     init,
     setUnitInfo,
@@ -392,6 +447,7 @@ function App() {
     generateFrames,
     getFrameMakerInstance,
     getFrameAnimatorInstance,
-    playFrames
+    playFrames,
+    createGif
   };
 }
