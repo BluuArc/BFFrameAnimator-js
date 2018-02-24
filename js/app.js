@@ -7,9 +7,77 @@ function App() {
     typeBtns: null,
     generateFramesBtn: null,
     form: null,
-    unitInfo: null
+    unitInfo: null,
+    notification: {
+      topBar: null,
+      bottomBar: null,
+      textArea: null
+    }
   };
   this.self = self;
+
+  function notify(topProgress, bottomProgress, messageContent, messageHeader, messageColor) {
+
+    if (self.notification.topBar) {
+      if (topProgress === undefined && messageColor !== 'red') {
+        // keep previous progress
+      } else if (isNaN(topProgress) && messageColor !== 'red') {
+        self.notification.topBar.hide();
+      } else {
+        self.notification.topBar.show();
+        if (topProgress > -1 && messageColor !== 'red') {
+          self.notification.topBar.removeClass('error');
+          self.notification.topBar.progress({ percent: topProgress });
+          if (topProgress === 100) {
+            self.notification.topBar.addClass('success');
+          } else {
+            self.notification.topBar.removeClass('success');
+          }
+        } else {
+          if (topProgress < 0) {
+            self.notification.topBar.progress({ percent: 100 });
+          }
+          self.notification.topBar.addClass('error');
+        }
+      }
+    }
+
+    if (self.notification.bottomBar) {
+      if (bottomProgress === undefined && messageColor !== 'red') {
+        // keep previous progress
+      } else if (isNaN(bottomProgress) && messageColor !== 'red') {
+        self.notification.bottomBar.hide();
+      } else {
+        self.notification.bottomBar.show();
+        if (bottomProgress > -1 && messageColor !== 'red') {
+          self.notification.bottomBar.removeClass('error');
+          self.notification.bottomBar.progress({ percent: bottomProgress });
+          if (topProgress === 100) {
+            self.notification.bottomBar.addClass('success');
+          } else {
+            self.notification.bottomBar.removeClass('success');
+          }
+        } else {
+          if (bottomProgress < 0) {
+            self.notification.bottomBar.progress({ percent: 100 });
+          }
+          self.notification.bottomBar.addClass('error');
+        }
+      }
+    }
+
+
+    if (self.notification.textArea) {
+      self.notification.textArea.find('.header').html(messageHeader || '');
+      self.notification.textArea.find('#content').html(messageContent);
+      
+      self.notification.textArea.attr('class', 'ui message');
+      if(messageColor) {
+        self.notification.textArea.addClass(messageColor);
+      }
+    }
+
+  }
 
   function init() {
     self.animationContainer = $("#animation-container");
@@ -17,6 +85,10 @@ function App() {
     self.typeBtns = self.animationContainer.find("#animation-type");
     self.generateFramesBtn = $("button#generate-frames-btn");
     self.form = $("#animation-options");
+
+    self.notification.topBar = $('#notification-area .top.attached.progress').progress({ percent: 0 });
+    self.notification.bottomBar = $('#notification-area .bottom.attached.progress').progress({ percent: 0 });
+    self.notification.textArea = $('#notification-area .message');
     
     self.frameAnimator.setStageCanvas(self.animationContainer.find('canvas#stage').get(0));
     
@@ -35,6 +107,7 @@ function App() {
     self.typeBtns.hide();
 
     console.info('Ready!');
+    notify(NaN, NaN, 'Please enter your animation options then click "Generate"', 'Ready!');
   }
 
   function setUnitInfo(info) {
@@ -56,11 +129,18 @@ function App() {
         img.setAttribute('src', `/getImage/${encodeURIComponent(url)}`);
       });
     };
-    
+
+    const numSteps = sheetArr.length;
+    let numFinished = 0;
+
     const domSheets = [];
     const loadPromises = sheetArr.map(sheetUrl => {
       return loadSpritesheet(sheetUrl)
-        .then(domImg => { domSheets.push(domImg); return; });
+        .then(domImg => {
+          domSheets.push(domImg);
+          notify((++numFinished / numSteps)*100, undefined, 'Getting spritesheets...', 'Processing...');
+          return;
+        });
     });
 
     return Promise.all(loadPromises)
@@ -166,6 +246,10 @@ function App() {
       const curPromise = loadCSV(cgs[type])
         .then(data => {
           result.cgs[type] = processCGS(data);
+
+          if (result.cgs[type].length === 0) {
+            throw Error("Array length is 0");
+          }
         }).catch(err => {
           console.warn(`Skipping loading CGS type ${type} due to error`,err);
           delete result.cgs[type];
@@ -182,15 +266,12 @@ function App() {
 
   function getAnimationInfo(animationUrls) {
     console.debug(animationUrls);
+    notify(NaN, NaN, 'Getting spritesheets...', 'Processing...');
     const fullInfo = {
       sheets: [],
       sheetFrameData: {
         cgg: [],
-        cgs: {
-          idle: [],
-          atk: [],
-          move: []
-        }
+        cgs: {}
       }
     };
 
@@ -201,16 +282,24 @@ function App() {
 
     return loadSheetsP.catch(err => {
       console.error('Error loading spritesheet(s)', err);
+      notify(undefined, undefined, 'Error getting spritesheets. Please check your URLs and/or unit ID.', 'Error', 'red');
       throw Error("SpritesheetLoad");
     }).then(() => {
+      notify(undefined, 1 / 2 * 100, 'Downloading and extracting unit information...', 'Processing...');
       console.info('Loading animation files', animationUrls.cgg, animationUrls.cgs);
       return loadAnimationData(animationUrls.cgg, animationUrls.cgs, fullInfo.sheetFrameData);
     }).then(() => {
+      notify(undefined, 2 / 2 * 100, 'Downloading and extracting unit information...', 'Processing...');
       if (animationUrls.bgColor) {
         fullInfo.bgColor = animationUrls.bgColor;
       }
+      
       console.debug({fullInfo: fullInfo});
       return fullInfo;
+    }).catch(err => {
+      console.error(err);
+      notify(undefined, undefined, 'Error getting unit information. Please check your URLs and/or unit ID.');
+      throw err;
     });
   }
 
@@ -228,6 +317,7 @@ function App() {
   }
 
   function getUnitInfoFromForm() {
+    notify(NaN, NaN, 'Reading form information...','Processing...');
     const basicInfo = {
       id: self.form.find("#unit-id input").val().trim(),
       server: self.form.find("#server-selection input:checked").val(),
@@ -241,6 +331,7 @@ function App() {
     console.debug({basicInfo});
 
     if (!isBasicInfoValid(basicInfo)) {
+      notify(-1, -1, 'Form input isn\'t valid. Please try again.' , 'Error', 'red');
       throw Error("Basic info isn't valid");
     } else {
       self.unitInfo = generateUrls(basicInfo);
@@ -248,6 +339,7 @@ function App() {
   }
 
   function generateUrls(basicInfo) {
+    notify(NaN, NaN, 'Generating URLs...', 'Processing...');
     const animationUrls = {
       anime: [],
       cgg: undefined,
@@ -312,7 +404,9 @@ function App() {
     }
     console.debug(self.unitInfo);
 
+    // mainly applies for cases with custom unit info
     if (!isUnitInfoValid(self.unitInfo)) {
+      notify(-1, -1, 'Unit information isn\'t valid. Please try again.', 'Error', 'red');
       throw Error('Unit info isn\'t valid');
     }
 
@@ -325,9 +419,29 @@ function App() {
         self.frameMaker.setBGColor(animationInfo.bgColor);
         self.frameMaker.debug();
 
+        const types = Object.keys(animationInfo.sheetFrameData.cgs);
+        let numFinished = 0;
+
+        for(const type of types) {
+          let progress = numFinished / types * 100;
+          notify(progress, progress, `Creating frames for animation type ${type}`, 'Generating Frames');
+
+          try {
+            self.frameMaker.renderFramesOfType(type);
+          } catch (err) {
+            console.error("Error generating frames for", type, err);
+            notify(undefined, undefined, `Error generating frames for type ${type}`, 'Error');
+            throw err;
+          }
+
+          progress = ++numFinished / types * 100;
+          notify(progress, progress, `Creating frames for animation type ${type}`, 'Generating Frames');
+        }
+
         self.frameMaker.renderAllFrames();
 
         console.info("Finished rendering frames");
+        notify(100, 100, `Finished generating frames.`, 'Complete', 'green');
         self.frameMaker.debug();
 
         // add buttons
@@ -384,8 +498,8 @@ function App() {
 
     self.frameAnimator.setCallbackFunctions({
       onAnimStart: (state) => console.debug('started!', state),
-      // afterRedraw: (state) => console.debug('drew frame', state.frameIndex, state),
       onAnimEnd: (state) => console.debug('ended!', state)
+      // afterRedraw: (state) => console.debug('drew frame', state.frameIndex, state),
     })
 
     self.frameAnimator.play();
@@ -398,7 +512,12 @@ function App() {
       }
 
       if (!type) {
+        notify(-1, -1, 'Error creating GIF', 'Error', 'red');
         throw Error("No type defined for GIF");
+      }
+
+      if (useTransparency === undefined) {
+        useTransparency = self.unitInfo.bgColor === undefined;
       }
 
       self.controlBtns.find('#generate').prop('disabled', true);
@@ -421,19 +540,25 @@ function App() {
 
       console.info('Creating GIF');
       console.debug(gif);
+      notify(0, 0, 'Creating GIF...', 'Processing...');
 
       gif.on('progress', amt => {
         console.debug('GIF progress', (amt*100).toFixed(2));
+        notify(amt * 100, amt * 100, 'Creating GIF...', 'Processing...');
       });
 
       gif.on('finished', (blob) => {
         console.info('Done creating GIF');
+        notify(100, 100, 'Finished Making GIF', 'Complete', 'green');
         console.debug({blob});
         self.controlBtns.find('#generate').prop('disabled', false).hide();
         self.controlBtns.find('#download').attr('href', URL.createObjectURL(blob))
           .show();
 
-        fulfill(blob, URL.createObjectURL(blob));
+        fulfill({
+          blob,
+          link: URL.createObjectURL(blob)
+        });
       });
 
       gif.render();

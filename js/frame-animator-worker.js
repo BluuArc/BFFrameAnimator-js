@@ -15,6 +15,12 @@ const FrameAnimator = function () {
     afterRedraw: nop, // after frame is drawn
     onAnimEnd: nop // when index === frames.length - 1, after frame is drawn
   };
+  /* 
+    TODO: add frame set array to animation state -> arrays of sprite entities
+      - each index has delay, index, frames, and id
+        - add draw position on canvas as an option
+      - event handlers will have id as extra parameter)
+  */
 
   function nop(animationState) {}
 
