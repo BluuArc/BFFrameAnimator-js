@@ -1,0 +1,46 @@
+87515244
+
+for index-old.html
+
+unitInfo.animation = {
+	anime: ["http://bf-prod-dlc-gumi-sg.akamaized.net/content/monster/img/unit_anime_87515244.png"],
+	cgg: "http://bf-prod-dlc-gumi-sg.akamaized.net/content/monster/cgg/unit_cgg_87515244.csv",	
+	cgs: {
+		"idle": "http://bf-prod-dlc-gumi-sg.akamaized.net/content/monster/cgs/unit_idle_cgs_87515244.csv",
+		"atk": "http://bf-prod-dlc-gumi-sg.akamaized.net/content/monster/cgs/unit_atk_cgs_87515244.csv"
+	}
+}
+
+
+unit_idle_87515244.gif
+unit_atk_87515244.gif
+
+For thunder golem
+
+http://bf-prod-dlc-gumi-sg.akamaized.net/content/monster/img/unit_anime_87515244.png
+http://bf-prod-dlc-gumi-sg.akamaized.net/content/monster/cgg/unit_cgg_87515244.csv
+http://bf-prod-dlc-gumi-sg.akamaized.net/content/monster/cgs/unit_idle_cgs_87515244.csv
+http://bf-prod-dlc-gumi-sg.akamaized.net/content/monster/cgs/unit_atk_cgs_87515244.csv
+
+---
+for index.html
+
+let unitInfo = {
+	anime: ["http://bf-prod-dlc-gumi-sg.akamaized.net/content/monster/img/unit_anime_87515244.png"],
+	cgg: "http://bf-prod-dlc-gumi-sg.akamaized.net/content/monster/cgg/unit_cgg_87515244.csv",	
+	cgs: {
+		"idle": "http://bf-prod-dlc-gumi-sg.akamaized.net/content/monster/cgs/unit_idle_cgs_87515244.csv",
+		"atk": "http://bf-prod-dlc-gumi-sg.akamaized.net/content/monster/cgs/unit_atk_cgs_87515244.csv"
+	}
+};
+
+myApp.setUnitInfo(unitInfo);
+
+myApp.generateFrames(unitInfo)
+	.then(() => {
+		myApp.getFrameAnimatorInstance().pause();
+		return myApp.createGif('atk')
+			.then(result => {
+				console.log(result);
+			})
+	})

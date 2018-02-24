@@ -1,351 +1,119 @@
-<!doctype html>
-<html lang="en">
-
-<head>
-    <title>BFFrameAnimator-js</title>
-    <!-- Required meta tags -->
+<html>
+  <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css" integrity="sha384-PsH8R72JQ3SOdhVi3uxftmaW6Vc51MKb0q5P2rRUpPvrszuE4W1povHYgTpBfshb"
-        crossorigin="anonymous">
-
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>BFDBReader-js</title>
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.7/semantic.min.css">
     <style>
-        .component {
-            margin-top: 5px;
-            margin-bottom: 15px;
-            border: 1px black solid;
-            border-radius: 5px;
-            min-height: 100px;
-            overflow-x: hidden;
-        }
-
-        .component .row {
-            margin: 0;
-        }
-
-        .hidden {
-            display: none;
-        }
+      #stage-container {
+        text-align: center;
+      }
     </style>
-</head>
+  </head>
+  <body>
 
-<body>
-    
-
-    <div class="container" id="sheetSection">
-        <div class="component" id="input">
-            <div class="row">
-                <form class="col-sm-12 col-md-6">
-                    <div class="form-row">
-                        <h4>Animation Info</h4>
-                    </div>
-                    <div class="form-group">
-                        <label for="idInput">Unit ID: </label>
-                        <input type="number" id="idInput" name="idInput" placeholder="e.g. 10011">
-                    </div>
-                    <div class="form-group">
-                        <label for="serverInput">Server: </label>
-                        <div class="form-check">
-                            <label class="form-check-label">
-                                <input class="form-check-input" type="radio" name="serverInput" value="gl" checked>
-                                Global
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <label class="form-check-label">
-                                <input class="form-check-input" type="radio" name="serverInput" value="jp">
-                                Japan
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <label class="form-check-label">
-                                <input class="form-check-input" type="radio" name="serverInput" value="eu">
-                                Europe
-                            </label>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="bgOption">Background Color: </label>
-                        <input list="colors" name="bgOption" id="bgOption" placeholder="#F00 or red works" aria-describedby="bgHelpBlock">
-                        <datalist id="colors">
-                            <option value="white"></option>
-                            <option value="black"></option>
-                        </datalist>
-                        <small id="bgHelpBlock" class="form-text text-muted">
-                            Leave blank to have a transparent background. <code>white</code> or <code>black</code> works based for exporting to GIF.
-                        </small>
-                    </div>
-                    <!-- <div class="form-row">
-                        <h4>Custom File URLs (Optional)</h4>
-                        <small class="form-text text-muted">
-                            These file options override the generated URLs for units.
-                        </small>
-                    </div>
-                    <div class="form-group">
-                        <label for="animeChoose">Spritesheet(s): </label>
-                        <input type="text" name="animeChoose" aria-describedby="animeHelp">
-                        <small id="animeHelp" class="form-text text-muted">
-                            Separate multiple spritesheets with a comma.
-                        </small>
-                    </div>
-                    <div class="form-group">
-                        <label for="cggChoose">CGG CSV File: </label>
-                        <input type="text" name="cggChoose" aria-describedby="cggHelp">
-                        <small id="cggHelp" class="form-text text-muted">
-                            This file contains the data to create every frame.
-                        </small>
-                    </div>
-                    <div class="form-group">
-                        <label for="cgsChoose">CGS CSV File(s): </label>
-                        <input type="text" name="cgsChoose" aria-describedby="cgsHelp">
-                        <small id="cgsHelp" class="form-text text-muted">
-                             This file contains the ordering and delay of frames. Separate multiple files with a comma.
-                        </small>
-                    </div> -->
-                    <button type="submit" class="btn btn-primary">Generate</button>
-                </form>
-                <div class="col-sm-12 col-md-6 align-middle text-center">
-                    <span id="formResult">Enter an ID</span>
-                </div>
+    <div class="ui container">
+      <div class="ui segments">
+        <div class="ui segment form" id="animation-options">
+          <div class="ui header">Options</div>
+          <div class="ui labeled input" id="unit-id">
+            <div class="ui label">Unit ID:</div>
+            <input type="text" placeholder="unit ID">
+          </div>
+          <div class="inline fields" id="server-selection">
+            <label>Server</label>
+            <div class="field">
+              <div class="ui radio checkbox">
+                <input type="radio" name="server" value="gl" checked="checked">
+                <label>Global</label>
+              </div>
             </div>
-            
+            <div class="field">
+              <div class="ui radio checkbox">
+                <input type="radio" name="server" value="jp">
+                <label>Japan</label>
+              </div>
+            </div>
+            <div class="field">
+              <div class="ui radio checkbox">
+                <input type="radio" name="server" value="eu">
+                <label>Europe</label>
+              </div>
+            </div>
+          </div>
+          <div class="ui fluid labeled input">
+            <div class="ui label">Background Color</div>
+            <input list="colors" name="bg-option" id="bg-option" placeholder="#F00 or red works" aria-describedby="bg-option">
+            <datalist id="colors">
+              <option value="white"></option>
+              <option value="black"></option>
+            </datalist>
+          </div>
+          <div id="bg-option">
+            Leave blank to have a transparent background.
+            <code>white</code> or
+            <code>black</code> works based for exporting to GIF.
+          </div>
+          <button class="ui blue button" id="generate-frames-btn">
+            Generate
+          </button>
         </div>
-        <div class="component" id="animation">
-            <div class="row">
-                <h1 class="col text-center">Animation</h1>
+        <div class="ui segment" id="notification-area">
+          <div class="ui top attached progress">
+            <div class="bar"></div>
+          </div>
+          <div class="ui message">
+            <div class="header">Header</div>
+            <div id="content">
+              Notifications show here.
             </div>
-            <div class="row justify-content-center">
-                <div class="btn-group" role="group" aria-label="Animation Button Group" id="animTypeGroup">
-
-                </div>
-            </div>
-            <div class="row justify-content-center" id="animationContainer">
-            </div>
-            <div class="row justify-content-center">
-                <div class="btn-group" role="group" aria-label="Animation State Group" id="animStateGroup">
-                    <button type="button" class="btn btn-secondary" id="play" disabled>Play</button>
-                    <button type="button" class="btn btn-secondary" id="stop" disabled>Stop</button>
-                    <button type="button" class="btn btn-secondary" id="createGif" disabled>Generate GIF</button>
-                    <a href="" target="_blank" id="downloadLink">Download GIF</a>
-                </div>
-            </div>
-            <div class="row justify-content-center">
-                <div class="form-group">
-                    <input type="checkbox" name="frameIndicator">
-                    <label for="frameIndicator">Show Frame Number</label>
-                </div>
-            </div>
+          </div>
+          <div class="ui bottom attached progress">
+            <div class="bar"></div>
+          </div>
         </div>
+      </div>
 
-        <div class="component">
-            <div class="row">
-                <h1 class="col text-center">Sprite Sheet</h1>
-            </div>
-            <div class="row justify-content-center" id="sheetContainer">
-                <img>
-            </div>
+      <div class="ui segments" id="animation-container">
+        <div class="ui segment">
+          <div class="ui header">Animation</div>
+          <div class="ui buttons attached" id="animation-type">
+            <button class="ui button">test</button>
+          </div>
+          <div id="stage-container" class="ui center attached">
+            <canvas id="stage"></canvas>
+          </div>
+          <div class="ui buttons attached" id="controls">
+            <button class="ui icon button" id="play">
+              <i class="play icon"></i>
+            </button>
+            <button class="ui icon button" id="pause">
+              <i class="pause icon"></i>
+            </button>
+            <button class="ui button" id="generate">
+              Generate GIF
+            </button>
+            <a class="ui green button" id="download" target="_blank">
+              Download GIF
+            </a>
+          </div>
         </div>
-
-        <div class="component hidden" id="partSection">
-            <div class="row">
-                <h1 class="col text-center">Frame Parts</h1>
-            </div>
-            <div class="row justify-content-center" id="partContainer">
-            </div>
+        <div class="ui segment">
         </div>
-
-        <div class="component hidden" id="frameSection">
-            <div class="row">
-                <h1 class="col text-center">Finished Frames</h1>
-            </div>
-            <div class="row justify-content-center" id="frameContainer">
-            </div>
-        </div>
-
-        
+      </div>
     </div>
 
-
-    <script src="https://code.jquery.com/jquery-3.2.1.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js" integrity="sha384-vFJXuSJphROIrBnz7yo7oB41mKfc8JzQZiCq4NCceLEaO4IHwicKwpJf9c9IpFgh"
-        crossorigin="anonymous"></script>
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js" integrity="sha384-alpBpkh1PFOepccYVYDB4do5UnbKysX5WZXm3XxPqe5iKTfUKjNkCk9SaVuEZflJ"
-        crossorigin="anonymous"></script>
-    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.7/semantic.min.js"></script>
     <script src="js/gif.js"></script>
-    <script src="js/frame-maker.js"></script>
-    <script src="js/frame-animator.js"></script>
+    <script src="js/frame-maker-worker.js"></script>
+    <script src="js/frame-animator-worker.js"></script>
+    <script src="js/app.js"></script>
+
     <script>
-        let activeType, useTransparency, frameIndicator;
-        function formLog(msg){
-            $("#formResult").html(msg);
-        }
-
-        function createGif(){
-            if(!activeType){
-                formLog("Please select an animation first");
-                return;
-            }
-
-            $("#animStateGroup #createGif").prop("disabled",true);
-            $("#downloadLink").hide();
-
-            let gifOptions = {
-                // background: 'rgba(0,0,0,0)',
-                workerScript: 'js/gif.worker.js',
-                copy: true,
-                quality: 1
-            };
-            if(useTransparency){
-                gifOptions.transparent = 'rgba(0,0,0,0)';
-            }
-
-            //based off of https://github.com/jnordberg/gif.js/issues/52
-            // and https://github.com/jnordberg/gif.js
-            let gif = new GIF(gifOptions);
-
-            let i = 0, curFrame = FrameMaker.getFrame(activeType, i);
-            while(curFrame !== undefined){
-                gif.addFrame(curFrame, { delay: Math.floor(+$(curFrame).attr("delay")/60 * 1000) });
-                curFrame = FrameMaker.getFrame(activeType, ++i);
-            }
-
-            console.log("Creating GIF",gif);
-            
-            gif.on('finished', function(blob){
-                console.log("done making GIF");
-                $("#animStateGroup #createGif").prop("disabled",false);
-                $("#downloadLink").attr('href',URL.createObjectURL(blob))
-                    .show();
-                // window.open(URL.createObjectURL(blob));
-            });
-
-            gif.render();
-            
-        }
-        
-        function displayFrameIndicator(frameCanvas) {
-            
-        }
-
-        function generateAnimation(options){
-            FrameAnimator.togglePlayState(false);
-
-            d3.selectAll("#frameContainer").selectAll("canvas").remove();
-            d3.selectAll("#partContainer").selectAll("canvas").remove();
-
-            FrameMaker.createAnimation(options)
-                .catch((err)=> {
-                    if(err === "SpritesheetLoad"){
-                        formLog("Error loading spritesheet(s). Possibly invalid ID or spritesheet is missing.");
-                        throw err;
-                    }
-                }).then(() => {
-                    const animTypes = FrameMaker.getAnimationTypes();
-                    console.log(animTypes);
-
-                    $("#animStateGroup #play").prop("disabled",false);
-                    $("#animStateGroup #stop").prop("disabled",false);
-                    $("#animStateGroup #createGif").prop("disabled",false);
-
-                    let btnHandler = function (d, i) {
-                            $("#downloadLink").hide();
-                            activeType = d;
-                            let sampleFrame = FrameMaker.getFrame(d, 0);
-                            let d3Frame = d3.select(sampleFrame);
-                            FrameAnimator.togglePlayState(false);
-                            requestAnimationFrame(() => {
-                                FrameAnimator.setCanvasDimensions(sampleFrame.width, sampleFrame.height);
-                                FrameAnimator.setAnimationState({
-                                    framesUntilIncrement: +d3Frame.attr('delay'),
-                                    frameIndex: 0,
-                                    speed: 1,
-                                    type: d
-                                });
-
-                                FrameAnimator.play(function (animationState) {
-                                    if (animationState.framesUntilIncrement > 0) {
-                                        return FrameMaker.getFrame(animationState.type, animationState.frameIndex);
-                                    } else {
-                                        let frame = FrameMaker.getFrame(animationState.type, ++animationState.frameIndex);
-                                        if (!frame) {
-                                            animationState.frameIndex = 0;
-                                            frame = FrameMaker.getFrame(animationState.type, animationState.frameIndex);
-                                        }
-                                        animationState.framesUntilIncrement = +d3.select(frame).attr('delay');
-                                        return frame;
-                                    }
-                                }, function (frameCanvas) {
-                                    if (!frameIndicator) return;
-                                    let fcContext = frameCanvas.getContext('2d');
-                                    fcContext.font = "30px Arial";
-                                    fcContext.fillText(FrameAnimator.getCurrentFrameIndex(), frameCanvas.width - 30 * 3, 30);
-                                    // console.log(FrameAnimator.getCurrentFrameIndex());
-                                });
-                            });
-                        }
-
-                    // create animation buttons
-                    let btnGroup = d3.select("#animTypeGroup").selectAll("button").data(animTypes);
-                    btnGroup.enter().append('button')
-                        .text((d,i) => d).classed("btn btn-primary", true)
-                        .on("click",btnHandler);
-                    btnGroup.text((d, i) => d).classed("btn btn-primary", true)
-                            .on("click", btnHandler);
-                    btnGroup.exit().remove();
-
-                    FrameAnimator.clear();
-                    formLog("<b class='text-success'>Finished!</b> Click " + animTypes.join(" or ") + " in the 'Animation' box to play the animation");
-                })
-        }
-
-        $(document).ready(() => {
-            FrameMaker.init({
-                frame: "#frameContainer",
-                parts: "#partContainer",
-                sheet: "#sheetContainer",
-                errorHandler: formLog
-            });
-            FrameAnimator.init({
-                animationContainer: "#animationContainer",
-                playButton: "#animStateGroup #play",
-                stopButton: "#animStateGroup #stop"
-            });
-
-            $("#downloadLink").hide();
-
-            $("input[name=frameIndicator").on("click",function(){
-                frameIndicator = $(this).prop('checked');
-            })
-
-            $("form button[type=submit]").on("click",function(e){
-                e.preventDefault();
-                let unitInfo = {
-                    id: $("form #idInput").val(),
-                    server: $("form input[name=serverInput]:checked").val(),
-                    bgColor: $("form input#bgOption").val()
-                };
-                useTransparency = unitInfo.bgColor.length === 0;
-                console.log(unitInfo);
-
-                if(isNaN(unitInfo.id) || unitInfo.id.toString().length < 5){
-                    formLog("Please enter an 5 digit or higher unit ID");
-                    return;
-                }
-
-               
-                formLog("Generating Animation");
-                $("#animStateGroup #createGif").prop("disabled",true);
-                $("#downloadLink").hide();
-                generateAnimation(unitInfo);
-                
-            });
-
-            $("button#createGif").on("click", createGif);
-        })
-        </script>
-</body>
-
+      var myApp = new App();
+      
+      $(document).ready(() => myApp.init());
+    </script>
+  </body>
 </html>
