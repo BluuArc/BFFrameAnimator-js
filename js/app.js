@@ -194,6 +194,9 @@ function App() {
       console.info('Loading animation files', animationUrls.cgg, animationUrls.cgs);
       return loadAnimationData(animationUrls.cgg, animationUrls.cgs, fullInfo.sheetFrameData);
     }).then(() => {
+      if (animationUrls.bgColor) {
+        fullInfo.bgColor = animationUrls.bgColor;
+      }
       console.debug({fullInfo: fullInfo});
       return fullInfo;
     });
@@ -215,8 +218,13 @@ function App() {
   function getUnitInfoFromForm() {
     const basicInfo = {
       id: self.form.find("#unit-id input").val().trim(),
-      server: self.form.find("#server-selection input:checked").val()
+      server: self.form.find("#server-selection input:checked").val(),
+      bgColor: self.form.find('input#bg-option').val()
     };
+
+    if (!basicInfo.bgColor) {
+      delete basicInfo.bgColor;
+    }
 
     console.debug({basicInfo});
 
@@ -264,6 +272,10 @@ function App() {
       animationUrls.cgs[type] = `${cgsPrefix}unit_${type}_cgs_${basicInfo.id}.csv`;
     }
 
+    if (basicInfo.bgColor) {
+      animationUrls.bgColor = basicInfo.bgColor;
+    }
+
     return animationUrls;
   }
 
@@ -298,6 +310,7 @@ function App() {
         self.frameMaker.setSpriteSheets(animationInfo.sheets);
         self.frameMaker.setCGGData(animationInfo.sheetFrameData.cgg);
         self.frameMaker.setCGSData(animationInfo.sheetFrameData.cgs);
+        self.frameMaker.setBGColor(animationInfo.bgColor);
         self.frameMaker.debug();
 
         self.frameMaker.renderAllFrames();

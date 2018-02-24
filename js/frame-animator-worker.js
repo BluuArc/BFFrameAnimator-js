@@ -83,7 +83,7 @@ const FrameAnimator = function () {
   }
 
   function tick() {
-    if (self.animationState.framesUntilRedraw === self.animationState.lastKnownDelay &&
+    if (self.animationState.framesUntilRedraw + 1 === self.animationState.lastKnownDelay &&
         self.animationState.currentFrameIndex === 0) {
       self.onAnimStart(self.animationState);
     } else if (self.animationState.framesUntilRedraw <= 0) {

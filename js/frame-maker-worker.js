@@ -6,6 +6,7 @@ const FrameMaker = function() {
       cgg: [],
       cgs: {},
     },
+    bgColor: undefined,
     frames: {}, // keyed by animation types, values for each is array of canvas frames
   };
 
@@ -18,6 +19,7 @@ const FrameMaker = function() {
     self.sheetFrameData.cgg = [];
     self.sheetFrameData.cgs = {};
     self.frames = {};
+    self.bgColor = undefined;
   }
 
   function addSpriteSheet(sheetData) {
@@ -39,6 +41,10 @@ const FrameMaker = function() {
 
   function setCGGData(arr) {
     self.sheetFrameData.cgg = arr;
+  }
+
+  function setBGColor(color) {
+    self.bgColor = color;
   }
 
   function makeCanvas(w, h) {
@@ -123,6 +129,11 @@ const FrameMaker = function() {
 
     const context = targetCanvas.getContext('2d');
     const tempCanvas = makeCanvas(targetCanvas.width, targetCanvas.height);
+
+    if (self.bgColor) {
+      context.fillStyle = self.bgColor;
+      context.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    }
 
     for(let i = frameData.frame_data.length - 1; i >= 0; --i) {
       const f = frameData.frame_data[i]; // draw in reverse order
@@ -258,6 +269,7 @@ const FrameMaker = function() {
     setSpriteSheets,
     setCGSData,
     setCGGData,
+    setBGColor,
     renderFramesOfType,
     renderAllFrames,
 
