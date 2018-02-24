@@ -127,6 +127,7 @@ let FrameMaker = (function(){
     }
 
     function loadAnimationData(unitInfo){
+        console.log("Loading animation data", unitInfo);
         const prefixUrl = servers[unitInfo.server];
         let animationData = {
             cgg: undefined,
@@ -204,7 +205,7 @@ let FrameMaker = (function(){
             return cgsData;
         }
 
-        const cgg = `${prefixUrl}${filepaths.cgg}unit_cgg_${unitInfo.id}.csv`, cgsPrefix = `${prefixUrl}${filepaths.cgs}`;
+        const cgg = unitInfo.animation.cgg || `${prefixUrl}${filepaths.cgg}unit_cgg_${unitInfo.id}.csv`, cgsPrefix = `${prefixUrl}${filepaths.cgs}`;
 
         let cggPromise = loadCSV(cgg)
             .then((data) => {
@@ -213,21 +214,36 @@ let FrameMaker = (function(){
             });
         
         let cgsPromises = [];
-        for(const c of cgsTypes){
-            let curPromise = loadCSV(`${cgsPrefix}unit_${c}_cgs_${unitInfo.id}.csv`)
-                .then((data) => {
-                    animationData.cgs[c] = processCGS(data);
-                }).catch((err) => {
-                    console.log(err);
-                    delete animationData.cgs[c];
-                    return;
-                });
-            cgsPromises.push(curPromise);
+        if(unitInfo.animation.cgs) {
+            for(const c in unitInfo.animation.cgs){ // links keyed by cgs type
+                let curPromise = loadCSV(unitInfo.animation.cgs[c])
+                    .then((data) => {
+                        animationData.cgs[c] = processCGS(data);
+                    }).catch((err) => {
+                        console.log(err);
+                        delete animationData.cgs[c];
+                        return;
+                    });
+                cgsPromises.push(curPromise);
+            }
+        }else{
+            for(const c of cgsTypes){
+                let curPromise = loadCSV(`${cgsPrefix}unit_${c}_cgs_${unitInfo.id}.csv`)
+                    .then((data) => {
+                        animationData.cgs[c] = processCGS(data);
+                    }).catch((err) => {
+                        console.log(err);
+                        delete animationData.cgs[c];
+                        return;
+                    });
+                cgsPromises.push(curPromise);
+            }
         }
 
 
         return Promise.all([cggPromise,...cgsPromises])
             .then(() => {
+                console.log(animationData);
                 return animationData;
             });
     }

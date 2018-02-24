@@ -1,0 +1,63 @@
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>BFDBReader-js</title>
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.7/semantic.min.css">
+  </head>
+  <body>
+
+    <div class="ui container">
+      <div class="ui segments">
+        <div class="ui segment" id="animation-options">
+          <div class="ui header">Options</div>
+          <div class="ui labeled input" id="unit-id">
+            <div class="ui label">Unit ID:</div>
+            <input type="text" placeholder="unit ID">
+          </div>
+          <div class="inline fields" id="server-selection">
+            <label>Server</label>
+            <div class="field">
+              <div class="ui radio checkbox">
+                <input type="radio" name="server" value="gl" checked="checked">
+                <label>Global</label>
+              </div>
+            </div>
+            <div class="field">
+              <div class="ui radio checkbox">
+                <input type="radio" name="server" value="jp">
+                <label>Japan</label>
+              </div>
+            </div>
+            <div class="field">
+              <div class="ui radio checkbox">
+                <input type="radio" name="server" value="eu">
+                <label>Europe</label>
+              </div>
+            </div>
+          </div>
+          <button class="ui blue button" id="generate-frames-btn">
+            Generate
+          </button>
+        </div>
+      </div>
+
+      <div class="ui segments" id="animation-container">
+        <div class="ui segment">
+          <div class="ui header">Animation</div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.7/semantic.min.js"></script>
+    <script src="js/frame-maker-worker.js"></script>
+    <script src="js/app.js"></script>
+
+    <script>
+      var myApp = new App();
+      
+      $(document).ready(() => myApp.init());
+    </script>
+  </body>
+</html>
