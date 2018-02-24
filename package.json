@@ -4,12 +4,14 @@
   "description": "",
   "main": "web_deployment.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "server": "node web_deployment.js"
   },
   "author": "Joshua Castor",
   "license": "ISC",
   "dependencies": {
     "express": "^4.15.3",
+    "puppeteer": "^1.1.1",
     "request": "^2.83.0",
     "request-promise": "^4.2.2",
     "yargs": "^8.0.2"

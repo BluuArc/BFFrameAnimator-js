@@ -8,6 +8,7 @@ function App() {
     generateFramesBtn: null,
     form: null,
     unitInfo: null,
+    basicInfo: null,
     notification: {
       topBar: null,
       bottomBar: null,
@@ -118,6 +119,10 @@ function App() {
     return self.unitInfo;
   }
 
+  function setBasicInfo(info) {
+    self.basicInfo = info;
+  }
+
   function loadSpritesheets(sheetArr) {
     const loadSpritesheet = (url) => {
       return new Promise((fulfill, reject) => {
@@ -134,10 +139,10 @@ function App() {
     let numFinished = 0;
 
     const domSheets = [];
-    const loadPromises = sheetArr.map(sheetUrl => {
+    const loadPromises = sheetArr.map((sheetUrl,index) => {
       return loadSpritesheet(sheetUrl)
         .then(domImg => {
-          domSheets.push(domImg);
+          domSheets[index] = domImg;
           notify((++numFinished / numSteps)*100, undefined, 'Getting spritesheets...', 'Processing...');
           return;
         });
@@ -316,7 +321,7 @@ function App() {
     return true;
   }
 
-  function getUnitInfoFromForm() {
+  function getBasicInfoFromForm() {
     notify(NaN, NaN, 'Reading form information...','Processing...');
     const basicInfo = {
       id: self.form.find("#unit-id input").val().trim(),
@@ -334,7 +339,7 @@ function App() {
       notify(-1, -1, 'Form input isn\'t valid. Please try again.' , 'Error', 'red');
       throw Error("Basic info isn't valid");
     } else {
-      self.unitInfo = generateUrls(basicInfo);
+      self.basicInfo = basicInfo;
     }
   }
 
@@ -400,7 +405,10 @@ function App() {
 
   function generateFrames() {
     if (!self.unitInfo) {
-      getUnitInfoFromForm();
+      if(!self.basicInfo) {
+        getBasicInfoFromForm();
+      }
+      self.unitInfo = generateUrls(self.basicInfo);
     }
     console.debug(self.unitInfo);
 
@@ -505,6 +513,18 @@ function App() {
     self.frameAnimator.play();
   }
 
+  function blobToBase64(blob) {
+    return new Promise((fulfill, reject) => {
+      const reader = new FileReader();
+      reader.onload = function () {
+        const dataUrl = reader.result;
+        const base64 = dataUrl.split(',')[1];
+        fulfill(base64);
+      };
+      reader.readAsDataURL(blob);
+    })
+  }
+
   function createGif(type, useTransparency) {
     return new Promise((fulfill, reject) => {
       if (!type) {
@@ -555,10 +575,13 @@ function App() {
         self.controlBtns.find('#download').attr('href', URL.createObjectURL(blob))
           .show();
 
-        fulfill({
-          blob,
-          link: URL.createObjectURL(blob)
-        });
+        blobToBase64(blob)
+          .then((encodedBlob) => {
+            fulfill({
+              blob: encodedBlob,
+              link: URL.createObjectURL(blob)
+            });
+          })
       });
 
       gif.render();
@@ -569,6 +592,7 @@ function App() {
     init,
     setUnitInfo,
     getUnitInfo,
+    setBasicInfo,
     generateFrames,
     getFrameMakerInstance,
     getFrameAnimatorInstance,
