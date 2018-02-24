@@ -131,7 +131,11 @@ function App() {
         img.onload = () => fulfill(img);
         img.onerror = img.onabort = (err) => reject(err);
 
-        img.setAttribute('src', `/getImage/${encodeURIComponent(url)}`);
+        if (url.startsWith('http')) {
+          img.setAttribute('src', `/getImage/${encodeURIComponent(url)}`);
+        } else {
+          img.setAttribute('src', url);
+        }
       });
     };
 
@@ -154,7 +158,8 @@ function App() {
 
   function loadCSV(path) {
     return new Promise((fulfill, reject) => {
-      $.get(`/get/${encodeURIComponent(path)}`)
+      const url = path.startsWith('http') ? `/get/${encodeURIComponent(path)}` : path;
+      $.get(url)
         .done(data => {
           try {
             const csv = data.split('\n').map(line => line.split(','));

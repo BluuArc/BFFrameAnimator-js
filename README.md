@@ -11,7 +11,7 @@
 ## Running the Server
 * Run `npm run server` in a terminal pointing to the directory of the repository
 
-## Making GIFs
+## Making Batches of GIFs from the Command Line
 
 * Server must be running in order for this to work
 * Run the command `node generate-gifs-desktop.js` with any of the following parameters

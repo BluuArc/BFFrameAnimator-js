@@ -12,6 +12,8 @@ const argv = require('yargs')
   .default('c', '')
     .alias('c', 'color')
     .describe('c', 'Color of the background of the animation. Can use hex (#F00) or CSS color name (red).')
+  .default('n', false)
+    .alias('n', 'notheadless')
   .help('h')
     .alias('h', 'help')
   .argv;
@@ -35,7 +37,7 @@ function base64BlobToGIF(base64Blob, filename = 'result.gif') {
 
 async function getPageInstance() {
   if (!browserInstance) {
-    browserInstance = await puppeteer.launch({ headless: true });
+    browserInstance = await puppeteer.launch({ headless: !argv.notheadless });
   }
 
   if (!pageInstance) {
@@ -163,10 +165,16 @@ async function start() {
   const advancedErrors = await createMultipleGifs(advancedUnits);
 
   if(unitErrors.length > 0) {
-    console.log("Encountered errors with the following units",unitErrors);
+    console.log("Encountered errors with the following units");
+    unitErrors.forEach(e => {
+      console.log(e,e.err, e.unit);
+    });
   }
   if (advancedErrors.length > 0) {
-    console.log("Encountered errors with the following advanced units", advancedErrors);
+    console.log("Encountered errors with the following advanced units");
+    advancedErrors.forEach(e => {
+      console.log(e.err, e.unit);
+    });
   }
   closeConnection();
   console.log("Done creating GIFs");
