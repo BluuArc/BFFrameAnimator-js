@@ -109,7 +109,7 @@ async function getAnimations(unitInfo) {
     return page.evaluate((pageType) => myApp.createGif(pageType), type)
       .then(result => {
         log('Saving GIF for',unitInfo.id, type);
-        return base64BlobToGIF(result.blob, `${argv.gifpath}/unit_${unitInfo.id}_${type}.gif`);
+        return base64BlobToGIF(result.blob, `${argv.gifpath}/${unitInfo.type || 'unit'}_${unitInfo.id}_${type}.gif`);
       });
   });
 
