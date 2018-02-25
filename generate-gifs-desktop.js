@@ -57,15 +57,35 @@ async function closeConnection() {
 }
 
 async function getAnimations(unitInfo) {
-  console.log({unitInfo});
-  console.info('Getting animations for', unitInfo.id);
-  console.log('Getting page instance');
+  const id = unitInfo.id;
+  const log = (...args) => console.log(`[${id}]`,...args);
+  log({unitInfo});
+
+  // check for existing files
+  if (unitInfo.cgs) {
+    for(const type in unitInfo.cgs) {
+      const filepath = `${argv.gifpath}/unit_${unitInfo.id}_${type}.gif`;
+      if (fs.existsSync(filepath)) {
+        log(`Skipping ${type} as ${filepath} already exists`);
+        delete unitInfo.cgs[type];
+      }
+    }
+  
+    if (Object.keys(unitInfo.cgs).length === 0) {
+      log(`Skipping animation generation as cgs portion is empty`);
+      throw 'EmptyCGS';
+    }
+  }
+
+  console.time("animation generation");
+  log('Getting animations');
+  log('Getting page instance');
   const page = await getPageInstance();
 
   // load animations
-  console.log('Generating frames for', unitInfo.id);
+  console.time("render time");
+  log('Generating frames for', unitInfo.id);
   const types = await page.evaluate((pageUnitInfo) => {
-
     myApp.setUnitInfo(null);
     myApp.setBasicInfo(null);
     if (pageUnitInfo.cgg !== undefined) {
@@ -80,19 +100,23 @@ async function getAnimations(unitInfo) {
         return myApp.getFrameMakerInstance().getAnimationTypes();
       });
   }, unitInfo);
+  console.timeEnd("render time");
 
   // generate gifs
-  console.log('Generating GIFs for', unitInfo.id);
+  console.time("GIF creation time");
+  log('Generating GIFs');
   let gifPromises = types.map(type => {
     return page.evaluate((pageType) => myApp.createGif(pageType), type)
       .then(result => {
-        console.log('Saving GIF for',unitInfo.id, type);
+        log('Saving GIF for',unitInfo.id, type);
         return base64BlobToGIF(result.blob, `${argv.gifpath}/unit_${unitInfo.id}_${type}.gif`);
       });
   });
 
   await Promise.all(gifPromises);
-  console.log('Finished getting animations for', unitInfo.id);
+  console.timeEnd("GIF creation time");
+  log('Finished getting animations');
+  console.timeEnd("animation generation");
 }
 
 async function createMultipleGifs(units = []) {
@@ -100,6 +124,7 @@ async function createMultipleGifs(units = []) {
   const errors = [];
 
   function createGifHelper(doneFn, errorFn) {
+    console.log(`[Units remaining: ${unitsToGenerate.length} of ${units.length}]`);
     if (unitsToGenerate.length === 0) {
       doneFn(errors);
     } else {

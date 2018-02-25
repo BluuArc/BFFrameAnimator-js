@@ -114,7 +114,7 @@ const FrameMaker = function() {
       h: yMax - yMin,
       offset: {//add to move sprite to right/bottom, add half to center - use as needed
         x: animType === "atk" ? (xMax - xMin) * 0.125 : 0,
-        y: animType === "atk" ? (yMax - yMin) * 0.20 : (yMax - yMin) * 0.40
+        y: animType === "atk" || animType ==="xbb" ? (yMax - yMin) * 0.20 : (yMax - yMin) * 0.40
       }
     };
 
