@@ -22,6 +22,8 @@ const puppeteer = require('puppeteer');
 const fs = require('fs');
 let browserInstance, pageInstance;
 
+let count = 0;
+
 function base64BlobToGIF(base64Blob, filename = 'result.gif') {
   return new Promise((fulfill, reject) => {
     const decodedBlob = new Buffer(base64Blob, 'base64');
@@ -52,6 +54,8 @@ async function closeConnection() {
   if (browserInstance || pageInstance) {
     const page = await getPageInstance();
     await browserInstance.close();
+    pageInstance = null;
+    browserInstance = null;
   }
   return;
 }
@@ -78,7 +82,6 @@ async function getAnimations(unitInfo) {
   }
 
   console.time("animation generation");
-  log('Getting animations');
   log('Getting page instance');
   const page = await getPageInstance();
 
@@ -117,6 +120,13 @@ async function getAnimations(unitInfo) {
   console.timeEnd("GIF creation time");
   log('Finished getting animations');
   console.timeEnd("animation generation");
+  count++;
+
+  // reset the browser every so often to avoid hangups
+  if (count > 15) {
+    await closeConnection();
+    count = 0;
+  }
 }
 
 async function createMultipleGifs(units = []) {
@@ -186,6 +196,7 @@ async function start() {
     throw Error("No input specified");
   }
 
+  console.time("Total Generation Time");
   const unitErrors = await createMultipleGifs(units);
   const advancedErrors = await createMultipleGifs(advancedUnits);
 
@@ -203,6 +214,7 @@ async function start() {
   }
   closeConnection();
   console.log("Done creating GIFs");
+  console.timeEnd("Total Generation Time");
 }
 
 start();
