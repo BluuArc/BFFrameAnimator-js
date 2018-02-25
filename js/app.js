@@ -95,6 +95,7 @@ function App() {
     
     self.generateFramesBtn.on('click', () => {
       self.unitInfo = null;
+      self.basicInfo = null;
       self.frameAnimator.pause(false);
       generateFrames();
     });
