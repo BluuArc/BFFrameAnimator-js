@@ -66,6 +66,11 @@ app.get('/', function (req,res) {
     res.sendFile("index.html").end();
 });
 
+// app.get('/framemaker', function (req, res) {
+//     console.log("Sending framemaker.html");
+//     res.sendFile("framemaker.html").end();
+// });
+
 var server = app.listen(app.get('port'), function () {
     console.log("Listening on " + this.address().address + ":" + this.address().port);
 });

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>FrameMaker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="js/app-bundle.js"></script>
+</head>
+<body>
+    <canvas id="target"></canvas>
+    <img class="spritesheet">
+    <script>
+        (() => {
+            app = new App();
+            app.init()
+                .then(() => {
+                    console.log('ready');
+                    app.frameMaker.drawFrame({
+                        spritesheets: [document.querySelector('img.spritesheet')],
+                        animationName: 'atk',
+                        animationIndex: 0,
+                        targetCanvas: document.querySelector('canvas#target')
+                    });
+                }).catch(err => console.error(err));
+        })();
+    </script>
+</body>
+</html>
