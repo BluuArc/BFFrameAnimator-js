@@ -8,16 +8,16 @@ export default class App {
   }
 
   static get SAMPLE_URLS () {
-    const baseUrl = 'http://2.cdn.bravefrontier.gumi.sg/content/';
+    const baseUrl = 'http://static-bravefrontier.gumi-europe.net/content/';
     const filepaths = {
       cgg: 'unit/cgg/',
       cgs: 'unit/cgs/',
       anime: 'unit/img/'
     };
     return {
-      anime: `/getImage/${encodeURIComponent(baseUrl + filepaths.anime + 'unit_anime_10011.png')}`,
-      cgg: `/get/${encodeURIComponent(baseUrl + filepaths.cgg + 'unit_cgg_10011.csv')}`,
-      cgs: `/get/${encodeURIComponent(baseUrl + filepaths.cgs + 'unit_atk_cgs_10011.csv')}`,
+      anime: `/getImage/${encodeURIComponent(baseUrl + filepaths.anime + 'unit_anime_720216.png')}`,
+      cgg: `/get/${encodeURIComponent(baseUrl + filepaths.cgg + 'unit_cgg_720216.csv')}`,
+      cgs: `/get/${encodeURIComponent(baseUrl + filepaths.cgs + 'unit_atk_cgs_720216.csv')}`,
     };
   }
 
@@ -31,7 +31,7 @@ export default class App {
     this._frameMaker = new FrameMaker(cggData);
 
     const cgsData = await this._loadCsv(App.SAMPLE_URLS.cgs);
-    await this._frameMaker.addAnimation('atk', cgsData);
+    await this._frameMaker.addAnimation('idle', cgsData);
 
     const targetCanvas = document.querySelector('canvas#target');
     targetCanvas.width = 500;

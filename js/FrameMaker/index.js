@@ -165,7 +165,7 @@ export default class FrameMaker {
       // blend code based off of this: http://pastebin.com/vXc0yNRh
       if (frame.blendMode === 1) {
         const imgData = tempContext.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-        const pixelData = imgData.getImageData;
+        const pixelData = imgData.data;
         for (let p = 0; p < pixelData.length; p += 4) {
           let [r, g, b, a] = [pixelData[p], pixelData[p + 1], pixelData[p + 2], pixelData[p + 3]];
           if (a > 0) {

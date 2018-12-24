@@ -167,7 +167,7 @@ var App = (function () {
         // blend code based off of this: http://pastebin.com/vXc0yNRh
         if (frame.blendMode === 1) {
           const imgData = tempContext.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-          const pixelData = imgData.getImageData;
+          const pixelData = imgData.data;
           for (let p = 0; p < pixelData.length; p += 4) {
             let [r, g, b, a] = [pixelData[p], pixelData[p + 1], pixelData[p + 2], pixelData[p + 3]];
             if (a > 0) {
@@ -195,16 +195,16 @@ var App = (function () {
     }
 
     static get SAMPLE_URLS () {
-      const baseUrl = 'http://2.cdn.bravefrontier.gumi.sg/content/';
+      const baseUrl = 'http://static-bravefrontier.gumi-europe.net/content/';
       const filepaths = {
         cgg: 'unit/cgg/',
         cgs: 'unit/cgs/',
         anime: 'unit/img/'
       };
       return {
-        anime: `/getImage/${encodeURIComponent(baseUrl + filepaths.anime + 'unit_anime_10011.png')}`,
-        cgg: `/get/${encodeURIComponent(baseUrl + filepaths.cgg + 'unit_cgg_10011.csv')}`,
-        cgs: `/get/${encodeURIComponent(baseUrl + filepaths.cgs + 'unit_atk_cgs_10011.csv')}`,
+        anime: `/getImage/${encodeURIComponent(baseUrl + filepaths.anime + 'unit_anime_720216.png')}`,
+        cgg: `/get/${encodeURIComponent(baseUrl + filepaths.cgg + 'unit_cgg_720216.csv')}`,
+        cgs: `/get/${encodeURIComponent(baseUrl + filepaths.cgs + 'unit_atk_cgs_720216.csv')}`,
       };
     }
 
@@ -218,7 +218,7 @@ var App = (function () {
       this._frameMaker = new FrameMaker(cggData);
 
       const cgsData = await this._loadCsv(App.SAMPLE_URLS.cgs);
-      await this._frameMaker.addAnimation('atk', cgsData);
+      await this._frameMaker.addAnimation('idle', cgsData);
 
       const targetCanvas = document.querySelector('canvas#target');
       targetCanvas.width = 500;
