@@ -18,9 +18,9 @@ export default class App {
       anime: 'unit/img/'
     };
     return {
-      anime: `/getImage/${encodeURIComponent(baseUrl + filepaths.anime + 'unit_anime_830647.png')}`,
-      cgg: `/get/${encodeURIComponent(baseUrl + filepaths.cgg + 'unit_cgg_830647.csv')}`,
-      cgs: `/get/${encodeURIComponent(baseUrl + filepaths.cgs + 'unit_atk_cgs_830647.csv')}`,
+      anime: `/getImage/${encodeURIComponent(baseUrl + filepaths.anime + 'unit_anime_850438.png')}`,
+      cgg: `/get/${encodeURIComponent(baseUrl + filepaths.cgg + 'unit_cgg_850438.csv')}`,
+      cgs: `/get/${encodeURIComponent(baseUrl + filepaths.cgs + 'unit_idle_cgs_850438.csv')}`,
     };
   }
 
@@ -34,7 +34,7 @@ export default class App {
     this._frameMaker = new FrameMaker(cggData);
 
     const cgsData = await this._loadCsv(App.SAMPLE_URLS.cgs);
-    await this._frameMaker.addAnimation('atk', cgsData);
+    await this._frameMaker.addAnimation('idle', cgsData);
 
     const targetCanvas = document.querySelector('canvas#target');
     targetCanvas.width = 2000;
@@ -49,10 +49,10 @@ export default class App {
       spritesheet.src = App.SAMPLE_URLS.anime;
     });
 
-    this._currentAnimation = 'atk';
+    this._currentAnimation = 'idle';
   }
 
-  renderFrame (index) {
+  renderFrame (index, options = {}) {
     const frameToRender = !isNaN(index) ? +index : this._frameIndex;
     const animation = this._frameMaker.getAnimation(this._currentAnimation);
     const isValidIndex = frameToRender < animation.frames.length && frameToRender >= 0;
@@ -64,6 +64,7 @@ export default class App {
       animationName: this._currentAnimation,
       animationIndex: isValidIndex ? frameToRender : 0,
       targetCanvas: this._targetCanvas,
+      ...options,
     });
 
     // mark center of canvas
