@@ -129,7 +129,7 @@ var App = (function () {
       const targetContext = targetCanvas.getContext('2d');
       const { bounds, cachedCanvases } = animationEntry;
       if (cachedCanvases[animationIndex] && !forceRedraw) {
-        console.debug(`drawing cached frame [cgs:${animationIndex}]`, cggFrame);
+        console.debug(`drawing cached frame [cgs:${animationIndex}]`);
         targetContext.drawImage(cachedCanvases[animationIndex], 0, 0);
         return;
       }
@@ -157,8 +157,6 @@ var App = (function () {
       // render each part in reverse order onto the frameCanvas
       cggFrame.parts.slice().reverse().forEach((part, i) => {
         const sourceWidth = part.img.width, sourceHeight = part.img.height;
-        const targetX = part.position.x + origin.x,
-          targetY = part.position.y + origin.y;
         tempContext.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
         tempContext.globalAlpha = part.opacity / 100;
 
@@ -176,9 +174,9 @@ var App = (function () {
         }
         // if (part.rotate !== 0) {
         //   console.debug('rotating', part.rotate);
-        //   tempContext.translate(targetX, targetY);
-        //   tempContext.rotate(part.rotate * Math.PI / 180);
-        //   tempContext.translate(-(targetX), -(targetY));
+        //   tempContext.translate(tempX, tempY);
+        //   tempContext.rotate(90 * Math.PI / 180);
+        //   tempContext.translate(-(tempX), -(tempY));
         //   // targetY += sourceHeight / 2;
         //   // targetX -= sourceWidth;
         // }
@@ -228,15 +226,27 @@ var App = (function () {
         // copy part result to frame canvas
         // const xOffset = tempCanvas.width - frameCanvas.width;
         // const yOffset = tempCanvas.height - frameCanvas.height;
+        frameContext.save();
+        const targetX = origin.x + part.position.x + sourceWidth / 2 - tempCanvasSize / 2,
+          targetY = origin.y + part.position.y + sourceHeight / 2 - tempCanvasSize / 2;
+        if (part.rotate !== 0) {
+          console.debug('rotating', part.rotate);
+          frameContext.translate(origin.x + part.position.x + sourceWidth / 2, origin.y + part.position.y + sourceHeight / 2);
+          frameContext.rotate(-part.rotate * Math.PI / 180);
+          frameContext.translate(-(origin.x + part.position.x + sourceWidth / 2), -(origin.y + part.position.y + sourceHeight / 2));
+          // targetY += sourceHeight / 2;
+          // targetX -= sourceWidth;
+        }
         frameContext.drawImage(
           tempCanvas,
           0, 0, // start at top left of temp canvas
           tempCanvas.width, tempCanvas.height,
-          origin.x + part.position.x + sourceWidth / 2 - tempCanvasSize / 2,
-          origin.y + part.position.y + sourceHeight / 2 - tempCanvasSize / 2,
+          targetX, targetY,
           tempCanvas.width, tempCanvas.height,
         );
+        frameContext.restore();
       });
+      cachedCanvases[animationIndex] = frameCanvas;
       // document.body.appendChild(frameCanvas);
       targetContext.drawImage(frameCanvas, 0, 0);
     }
@@ -251,16 +261,16 @@ var App = (function () {
     }
 
     static get SAMPLE_URLS () {
-      const baseUrl = 'http://static-bravefrontier.gumi-europe.net/content/';
+      const baseUrl = 'http://2.cdn.bravefrontier.gumi.sg/content/';
       const filepaths = {
         cgg: 'unit/cgg/',
         cgs: 'unit/cgs/',
         anime: 'unit/img/'
       };
       return {
-        anime: `/getImage/${encodeURIComponent(baseUrl + filepaths.anime + 'unit_anime_750216.png')}`,
-        cgg: `/get/${encodeURIComponent(baseUrl + filepaths.cgg + 'unit_cgg_750216.csv')}`,
-        cgs: `/get/${encodeURIComponent(baseUrl + filepaths.cgs + 'unit_skill_cgs_750216.csv')}`,
+        anime: `/getImage/${encodeURIComponent(baseUrl + filepaths.anime + 'unit_anime_830647.png')}`,
+        cgg: `/get/${encodeURIComponent(baseUrl + filepaths.cgg + 'unit_cgg_830647.csv')}`,
+        cgs: `/get/${encodeURIComponent(baseUrl + filepaths.cgs + 'unit_atk_cgs_830647.csv')}`,
       };
     }
 
@@ -274,7 +284,7 @@ var App = (function () {
       this._frameMaker = new FrameMaker(cggData);
 
       const cgsData = await this._loadCsv(App.SAMPLE_URLS.cgs);
-      await this._frameMaker.addAnimation('skill', cgsData);
+      await this._frameMaker.addAnimation('atk', cgsData);
 
       const targetCanvas = document.querySelector('canvas#target');
       targetCanvas.width = 2000;
@@ -289,7 +299,7 @@ var App = (function () {
         spritesheet.src = App.SAMPLE_URLS.anime;
       });
 
-      this._currentAnimation = 'skill';
+      this._currentAnimation = 'atk';
     }
 
     renderFrame (index) {

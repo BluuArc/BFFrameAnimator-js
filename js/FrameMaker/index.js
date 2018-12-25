@@ -127,7 +127,7 @@ export default class FrameMaker {
     const targetContext = targetCanvas.getContext('2d');
     const { bounds, cachedCanvases } = animationEntry;
     if (cachedCanvases[animationIndex] && !forceRedraw) {
-      console.debug(`drawing cached frame [cgs:${animationIndex}]`, cggFrame);
+      console.debug(`drawing cached frame [cgs:${animationIndex}]`);
       targetContext.drawImage(cachedCanvases[animationIndex], 0, 0);
       return;
     }
@@ -155,8 +155,6 @@ export default class FrameMaker {
     // render each part in reverse order onto the frameCanvas
     cggFrame.parts.slice().reverse().forEach((part, i) => {
       const sourceWidth = part.img.width, sourceHeight = part.img.height;
-      const targetX = part.position.x + origin.x,
-        targetY = part.position.y + origin.y;
       tempContext.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
       tempContext.globalAlpha = part.opacity / 100;
 
@@ -174,9 +172,9 @@ export default class FrameMaker {
       }
       // if (part.rotate !== 0) {
       //   console.debug('rotating', part.rotate);
-      //   tempContext.translate(targetX, targetY);
-      //   tempContext.rotate(part.rotate * Math.PI / 180);
-      //   tempContext.translate(-(targetX), -(targetY));
+      //   tempContext.translate(tempX, tempY);
+      //   tempContext.rotate(90 * Math.PI / 180);
+      //   tempContext.translate(-(tempX), -(tempY));
       //   // targetY += sourceHeight / 2;
       //   // targetX -= sourceWidth;
       // }
@@ -226,15 +224,27 @@ export default class FrameMaker {
       // copy part result to frame canvas
       // const xOffset = tempCanvas.width - frameCanvas.width;
       // const yOffset = tempCanvas.height - frameCanvas.height;
+      frameContext.save();
+      const targetX = origin.x + part.position.x + sourceWidth / 2 - tempCanvasSize / 2,
+        targetY = origin.y + part.position.y + sourceHeight / 2 - tempCanvasSize / 2;
+      if (part.rotate !== 0) {
+        console.debug('rotating', part.rotate);
+        frameContext.translate(origin.x + part.position.x + sourceWidth / 2, origin.y + part.position.y + sourceHeight / 2);
+        frameContext.rotate(-part.rotate * Math.PI / 180);
+        frameContext.translate(-(origin.x + part.position.x + sourceWidth / 2), -(origin.y + part.position.y + sourceHeight / 2));
+        // targetY += sourceHeight / 2;
+        // targetX -= sourceWidth;
+      }
       frameContext.drawImage(
         tempCanvas,
         0, 0, // start at top left of temp canvas
         tempCanvas.width, tempCanvas.height,
-        origin.x + part.position.x + sourceWidth / 2 - tempCanvasSize / 2,
-        origin.y + part.position.y + sourceHeight / 2 - tempCanvasSize / 2,
+        targetX, targetY,
         tempCanvas.width, tempCanvas.height,
       );
+      frameContext.restore();
     });
+    cachedCanvases[animationIndex] = frameCanvas;
     // document.body.appendChild(frameCanvas);
     targetContext.drawImage(frameCanvas, 0, 0);
   }
