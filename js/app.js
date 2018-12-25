@@ -18,9 +18,9 @@ export default class App {
       anime: 'unit/img/'
     };
     return {
-      anime: `/getImage/${encodeURIComponent(baseUrl + filepaths.anime + 'unit_anime_720216.png')}`,
-      cgg: `/get/${encodeURIComponent(baseUrl + filepaths.cgg + 'unit_cgg_720216.csv')}`,
-      cgs: `/get/${encodeURIComponent(baseUrl + filepaths.cgs + 'unit_atk_cgs_720216.csv')}`,
+      anime: `/getImage/${encodeURIComponent(baseUrl + filepaths.anime + 'unit_anime_750216.png')}`,
+      cgg: `/get/${encodeURIComponent(baseUrl + filepaths.cgg + 'unit_cgg_750216.csv')}`,
+      cgs: `/get/${encodeURIComponent(baseUrl + filepaths.cgs + 'unit_skill_cgs_750216.csv')}`,
     };
   }
 
@@ -34,7 +34,7 @@ export default class App {
     this._frameMaker = new FrameMaker(cggData);
 
     const cgsData = await this._loadCsv(App.SAMPLE_URLS.cgs);
-    await this._frameMaker.addAnimation('atk', cgsData);
+    await this._frameMaker.addAnimation('skill', cgsData);
 
     const targetCanvas = document.querySelector('canvas#target');
     targetCanvas.width = 2000;
@@ -49,7 +49,7 @@ export default class App {
       spritesheet.src = App.SAMPLE_URLS.anime;
     });
 
-    this._currentAnimation = 'atk';
+    this._currentAnimation = 'skill';
   }
 
   renderFrame (index) {
@@ -65,12 +65,15 @@ export default class App {
       animationIndex: isValidIndex ? frameToRender : 0,
       targetCanvas: this._targetCanvas,
     });
+
+    // mark center of canvas
     context.save();
     context.fillStyle = 'red';
     context.beginPath();
     context.ellipse(this._targetCanvas.width / 2, this._targetCanvas.height / 2, 3, 3, Math.PI / 2, 0, Math.PI * 2);
     context.fill();
     context.restore();
+  
     this._frameIndex = isValidIndex ? frameToRender + 1 : 0;
   }
 

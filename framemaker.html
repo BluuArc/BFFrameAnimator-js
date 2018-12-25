@@ -6,6 +6,14 @@
     <title>FrameMaker</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="js/app-bundle.js"></script>
+    <style>
+        body {
+            background: grey;
+        }
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
 </head>
 <body>
     <canvas id="target"></canvas>
@@ -16,7 +24,7 @@
             app.init()
                 .then(() => {
                     console.log('ready');
-                    app.renderFrame(9);
+                    app.renderFrame(46);
                     // app.frameMaker.drawFrame({
                     //     spritesheets: [document.querySelector('img.spritesheet')],
                     //     animationName: 'idle',
