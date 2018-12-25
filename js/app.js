@@ -5,6 +5,9 @@ import FrameMaker from './FrameMaker';
 export default class App {
   constructor () {
     this._frameMaker = null;
+    this._targetCanvas = null;
+    this._frameIndex = -1;
+    this._currentAnimation = null;
   }
 
   static get SAMPLE_URLS () {
@@ -31,11 +34,12 @@ export default class App {
     this._frameMaker = new FrameMaker(cggData);
 
     const cgsData = await this._loadCsv(App.SAMPLE_URLS.cgs);
-    await this._frameMaker.addAnimation('idle', cgsData);
+    await this._frameMaker.addAnimation('atk', cgsData);
 
     const targetCanvas = document.querySelector('canvas#target');
-    targetCanvas.width = 500;
-    targetCanvas.height = 500;
+    targetCanvas.width = 2000;
+    targetCanvas.height = 2000;
+    this._targetCanvas = targetCanvas;
 
     const spritesheet = document.querySelector('img.spritesheet');
     await new Promise((fulfill, reject) => {
@@ -44,6 +48,30 @@ export default class App {
 
       spritesheet.src = App.SAMPLE_URLS.anime;
     });
+
+    this._currentAnimation = 'atk';
+  }
+
+  renderFrame (index) {
+    const frameToRender = !isNaN(index) ? +index : this._frameIndex;
+    const animation = this._frameMaker.getAnimation(this._currentAnimation);
+    const isValidIndex = frameToRender < animation.frames.length && frameToRender >= 0;
+
+    const context = this._targetCanvas.getContext('2d');
+    context.clearRect(0, 0, this._targetCanvas.width, this._targetCanvas.height);
+    this._frameMaker.drawFrame({
+      spritesheets: [document.querySelector('img.spritesheet')],
+      animationName: this._currentAnimation,
+      animationIndex: isValidIndex ? frameToRender : 0,
+      targetCanvas: this._targetCanvas,
+    });
+    context.save();
+    context.fillStyle = 'red';
+    context.beginPath();
+    context.ellipse(this._targetCanvas.width / 2, this._targetCanvas.height / 2, 3, 3, Math.PI / 2, 0, Math.PI * 2);
+    context.fill();
+    context.restore();
+    this._frameIndex = isValidIndex ? frameToRender + 1 : 0;
   }
 
   get frameMaker () {

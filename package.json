@@ -5,7 +5,7 @@
   "main": "web_deployment.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node web_deployment.js",
+    "start": "npm run build && node web_deployment.js",
     "build": "rollup --config rollup.config.js"
   },
   "author": "Joshua Castor",

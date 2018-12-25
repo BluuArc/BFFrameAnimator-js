@@ -7,14 +7,14 @@ const calculateAnimationBounds = greenlet(function (cgsEntry = [], frames = []) 
     const frameData = frames[cgsFrame.frameIndex];
     const xOffset = Math.abs(cgsFrame.xOffset) || 0;
     const yOffset = Math.abs(cgsFrame.yOffset) || 0;
-    frameData.frames.forEach(frame => {
+    frameData.parts.forEach(part => {
       // bounds are x +- width and y += height
-      const w = frame.img.width, h = frame.img.height;
-      xMin = Math.min(xMin, frame.position.x - w - xOffset);
-      yMin = Math.min(yMin, frame.position.y - h - yOffset);
+      const w = part.img.width, h = part.img.height;
+      xMin = Math.min(xMin, part.position.x - w - xOffset);
+      yMin = Math.min(yMin, part.position.y - h - yOffset);
 
-      xMax = Math.max(xMax, frame.position.x + w + xOffset);
-      yMax = Math.max(yMax, frame.position.y + h + yOffset);
+      xMax = Math.max(xMax, part.position.x + w + xOffset);
+      yMax = Math.max(yMax, part.position.y + h + yOffset);
     });
   });
   return {
@@ -35,13 +35,13 @@ export default class FrameMaker {
     const entry = {
       anchorType: +frameLine[0],
       partCount: +frameLine[1],
-      frames: [],
+      parts: [],
     };
 
     let curIndex = 2, partCount = 0;
-    const frameIsValid = (frame = {}) => {
-      for (const field in frame) {
-        if (field !== 'position' && field !== 'img' && isNaN(frame[field])) {
+    const partIsValid = (part = {}) => {
+      for (const field in part) {
+        if (field !== 'position' && field !== 'img' && isNaN(part[field])) {
           return false;
         }
       }
@@ -50,7 +50,7 @@ export default class FrameMaker {
 
     // parse each part in the line
     while (partCount < entry.partCount) {
-      const frame = {
+      const part = {
         position: { // origin is middle
           x: +frameLine[curIndex++],
           y: +frameLine[curIndex++],
@@ -67,11 +67,11 @@ export default class FrameMaker {
         },
         pageId: +frameLine[curIndex++],
       };
-      if (frameIsValid(frame)) {
+      if (partIsValid(part)) {
         partCount++;
-        entry.frames.push(frame);
+        entry.parts.push(part);
       } else {
-        console.warn('Encountered NaN frame', frame, index);
+        console.warn('Encountered NaN part', part, index);
       }
     }
     return entry;
@@ -111,6 +111,10 @@ export default class FrameMaker {
     };
   }
 
+  getAnimation (key = 'name') {
+    return this._animations[key];
+  }
+
   drawFrame ({
     spritesheets = [], // array of img elements containing sprite sheets
     animationName = 'name', animationIndex = -1,
@@ -124,6 +128,8 @@ export default class FrameMaker {
     const { bounds, tempCanvas } = animationEntry;
     const cgsFrame = animationEntry.frames[animationIndex];
     const cggFrame = this._frames[cgsFrame.frameIndex];
+
+    console.debug(`drawing frame [cgs:${animationIndex}, cgg:${cgsFrame.frameIndex}]`, cggFrame);
 
     // update width and height as necessary
     if (tempCanvas.width !== targetCanvas.width) {
@@ -140,25 +146,39 @@ export default class FrameMaker {
     const targetContext = targetCanvas.getContext('2d');
     const tempContext = tempCanvas.getContext('2d');
     // render each part in reverse order
-    cggFrame.frames.slice().reverse().forEach(frame => {
+    cggFrame.parts.slice().reverse().forEach(frame => {
       const sourceWidth = frame.img.width, sourceHeight = frame.img.height;
+      let targetX = frame.position.x + origin.x,
+        targetY = frame.position.y + origin.y;
       tempContext.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
       tempContext.globalAlpha = frame.opacity / 100;
 
-      const flipX = frame.next_type == 1 || frame.next_type == 3;
-      const flipY = frame.next_type == 2 || frame.next_type == 3;
-      tempContext.save();
-      if (flipX || flipY || frame.rotate !== 0) {
+      const flipX = frame.nextType === 1 || frame.nextType === 3;
+      const flipY = frame.nextType === 2 || frame.nextType === 3;
+
+      tempContext.save(); 
+      if (flipX || !flipY) {
         tempContext.translate(flipX ? sourceWidth : 0, flipY ? sourceHeight : 0);
         tempContext.scale(flipX ? -1 : 1, flipY ? -1 : 1);
-
-        // TODO: handle rotations
+        targetX = (flipX ? targetX - tempCanvas.width + sourceWidth : targetX);
+        targetY = (flipY ? targetY - tempCanvas.height + sourceHeight: targetY);
+      }
+      if (frame.rotate !== 0) {
+        console.debug('rotating', frame.rotate, (360 % frame.rotate));
+        tempContext.translate(targetX, targetY);
+        tempContext.rotate(frame.rotate * Math.PI / 180);
+        tempContext.translate(-(targetX), -(targetY));
+        // targetY += sourceHeight / 2;
+        targetX -= sourceWidth;
       }
       tempContext.drawImage(
         spritesheets[frame.pageId],
         frame.img.x, frame.img.y, sourceWidth, sourceHeight,
         // TODO: handle offsets here?
-        frame.position.x + origin.x, frame.position.y + origin.y, sourceWidth, sourceHeight, 
+        // (flipX ? targetX - tempCanvas.width - sourceWidth / 2 : targetX),
+        // (flipY ? targetY - tempCanvas.height + sourceHeight / 2 : targetY),
+        targetX, targetY,
+        sourceWidth, sourceHeight,
       );
       tempContext.restore();
 

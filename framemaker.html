@@ -16,12 +16,13 @@
             app.init()
                 .then(() => {
                     console.log('ready');
-                    app.frameMaker.drawFrame({
-                        spritesheets: [document.querySelector('img.spritesheet')],
-                        animationName: 'idle',
-                        animationIndex: 0,
-                        targetCanvas: document.querySelector('canvas#target')
-                    });
+                    app.renderFrame(9);
+                    // app.frameMaker.drawFrame({
+                    //     spritesheets: [document.querySelector('img.spritesheet')],
+                    //     animationName: 'idle',
+                    //     animationIndex: 4,
+                    //     targetCanvas: document.querySelector('canvas#target')
+                    // });
                 }).catch(err => console.error(err));
         })();
     </script>
