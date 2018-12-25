@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "npm run build && node web_deployment.js",
-    "build": "rollup --config rollup.config.js"
+    "build": "rollup --config rollup.config.js",
+    "dev": "nodemon --exec \"npm run start\" --config nodemon.json"
   },
   "author": "Joshua Castor",
   "license": "ISC",

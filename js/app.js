@@ -75,7 +75,7 @@ export default class App {
     context.fill();
     context.restore();
   
-    this._frameIndex = isValidIndex ? frameToRender + 1 : 0;
+    this._frameIndex = (frameToRender + 1 < animation.frames.length && frameToRender >= 0) ? frameToRender + 1 : 0;
   }
 
   get frameMaker () {

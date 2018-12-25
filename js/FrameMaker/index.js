@@ -259,6 +259,7 @@ export default class FrameMaker {
       frameContext.stroke();
     }
     cachedCanvases[animationIndex] = frameCanvas;
+    tempCanvas.remove();
     return frameCanvas;
   }
 

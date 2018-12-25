@@ -261,6 +261,7 @@ var App = (function () {
         frameContext.stroke();
       }
       cachedCanvases[animationIndex] = frameCanvas;
+      tempCanvas.remove();
       return frameCanvas;
     }
 
@@ -356,7 +357,7 @@ var App = (function () {
       context.fill();
       context.restore();
     
-      this._frameIndex = isValidIndex ? frameToRender + 1 : 0;
+      this._frameIndex = (frameToRender + 1 < animation.frames.length && frameToRender >= 0) ? frameToRender + 1 : 0;
     }
 
     get frameMaker () {
