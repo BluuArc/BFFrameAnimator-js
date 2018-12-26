@@ -22,7 +22,7 @@ const calculateAnimationBounds = greenlet(function (cgsEntry = [], frames = [], 
     y: [yMin, yMax],
     w: xMax - xMin,
     h: yMax - yMin,
-    offset: { // relative to top left of screen
+    offset: { // relative to top left of screen; equivalent to padding
       x: (xMax - xMin) * 0.125,
       y: (yMax - yMin) * 0.20,
     },
@@ -59,7 +59,7 @@ export default class FrameMaker {
           x: +frameLine[curIndex++],
           y: +frameLine[curIndex++],
         },
-        nextType: +frameLine[curIndex++],
+        flipType: +frameLine[curIndex++],
         blendMode: +frameLine[curIndex++],
         opacity: +frameLine[curIndex++],
         rotate: +frameLine[curIndex++],
@@ -175,8 +175,8 @@ export default class FrameMaker {
       tempContext.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
       tempContext.globalAlpha = part.opacity / 100;
 
-      const flipX = part.nextType === 1 || part.nextType === 3;
-      const flipY = part.nextType === 2 || part.nextType === 3;
+      const flipX = part.flipType === 1 || part.flipType === 3;
+      const flipY = part.flipType === 2 || part.flipType === 3;
 
       // draw part onto center of part canvas
       tempContext.save(); 
