@@ -35,6 +35,67 @@ export default class FrameMaker {
     this._animations = {};
   }
 
+  // very specific (but main use case) for the frame maker: animate Brave Frontier units
+  static async fromBraveFrontierUnit (id = '10011', server = 'gl', doTrim = false) {
+    const serverUrls = {
+      eu: 'http://static-bravefrontier.gumi-europe.net/content/',
+      gl: 'http://2.cdn.bravefrontier.gumi.sg/content/',
+      jp: 'http://cdn.android.brave.a-lim.jp/',
+    };
+    const filepaths = {
+      cgg: 'unit/cgg/',
+      cgs: 'unit/cgs/',
+      anime: 'unit/img/'
+    };
+    const animationTypes = ['idle', 'atk', 'move', server === 'eu' && 'skill'].filter(v => v);
+    const loadCsv = (path) => fetch(path)
+      .then(r => {
+        if (r.status !== 200) {
+          throw new Error(`Fetch error: ${r.status} - ${r.statusText}`);
+        }
+        return r.text();
+      }).then(r => r.split('\n').map(line => line.split(',')));
+
+    const baseUrl = serverUrls[server];
+    if (!baseUrl) {
+      throw new Error(`Unknown server [${server}]`);
+    }
+
+    // start querying for data simultaneously
+    const imagePromise = new Promise((fulfill, reject) => {
+      const spritesheet = new Image();
+      spritesheet.onload = () => fulfill(spritesheet);
+      spritesheet.onerror = spritesheet.onabort = reject;
+      spritesheet.src = `/getImage/${encodeURIComponent(baseUrl + filepaths.anime + `unit_anime_${id}.png`)}`;
+    });
+
+    const cgsCsv = {};
+    const cgsPromises = animationTypes.map(type => {
+      return loadCsv(`/get/${encodeURIComponent(baseUrl + filepaths.cgs + `unit_${type}_cgs_${id}.csv`)}`)
+        .then(csv => { cgsCsv[type] = csv; })
+        .catch(err => {
+          // eslint-disable-next-line no-console
+          console.warn(`Skipping CGS [${type}] due to error`, err);
+          return;
+        });
+    });
+
+    const maker = await loadCsv(`/get/${encodeURIComponent(baseUrl + filepaths.cgg + `unit_cgg_${id}.csv`)}`)
+      .then(csv => new FrameMaker(csv));
+
+    // add found cgs animations to maker
+    await Promise.all(cgsPromises);
+    for (const key in cgsCsv) {
+      await maker.addAnimation(key, cgsCsv[key], doTrim);
+    }
+
+    // return the spritesheet and FrameMaker instance
+    return imagePromise.then(spritesheet => ({
+      maker,
+      spritesheet,
+    }));
+  }
+
   _cggLineToEntry (frameLine = [], index = -1) {
     const entry = {
       anchorType: +frameLine[0],
@@ -139,13 +200,13 @@ export default class FrameMaker {
 
     const { bounds, cachedCanvases } = animationEntry;
     if (cachedCanvases[animationIndex] && !forceRedraw) {
-      console.debug(`using cached frame [cgs:${animationIndex}]`);
+      // console.debug(`using cached frame [cgs:${animationIndex}]`);
       return cachedCanvases[animationIndex];
     }
 
     const cgsFrame = animationEntry.frames[animationIndex];
     const cggFrame = this._frames[cgsFrame.frameIndex];
-    console.debug(`drawing frame [cgs:${animationIndex}, cgg:${cgsFrame.frameIndex}]`, cggFrame);
+    // console.debug(`drawing frame [cgs:${animationIndex}, cgg:${cgsFrame.frameIndex}]`, cggFrame);
 
     const tempCanvasSize = (spritesheets.reduce((acc, val) => Math.max(acc, val.width, val.height), Math.max(bounds.w + bounds.offset.x * 2, bounds.h + bounds.offset.y * 2))) * 2;
     // used as a temp canvas for rotating/flipping parts

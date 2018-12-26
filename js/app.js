@@ -7,49 +7,21 @@ export default class App {
     this._frameMaker = null;
     this._targetCanvas = null;
     this._frameIndex = -1;
+    this._spritesheets = [];
     this._currentAnimation = null;
   }
 
-  static get SAMPLE_URLS () {
-    const baseUrl = 'http://2.cdn.bravefrontier.gumi.sg/content/';
-    const filepaths = {
-      cgg: 'unit/cgg/',
-      cgs: 'unit/cgs/',
-      anime: 'unit/img/'
-    };
-    return {
-      anime: `/getImage/${encodeURIComponent(baseUrl + filepaths.anime + 'unit_anime_850438.png')}`,
-      cgg: `/get/${encodeURIComponent(baseUrl + filepaths.cgg + 'unit_cgg_850438.csv')}`,
-      cgs: `/get/${encodeURIComponent(baseUrl + filepaths.cgs + 'unit_idle_cgs_850438.csv')}`,
-    };
-  }
-
-  _loadCsv (path) {
-    return fetch(path).then(r => r.text())
-      .then(r => r.split('\n').map(line => line.split(',')));
-  }
-
   async init () {
-    const cggData = await this._loadCsv(App.SAMPLE_URLS.cgg);
-    this._frameMaker = new FrameMaker(cggData);
-
-    const cgsData = await this._loadCsv(App.SAMPLE_URLS.cgs);
-    await this._frameMaker.addAnimation('idle', cgsData);
-
     const targetCanvas = document.querySelector('canvas#target');
     targetCanvas.width = 2000;
     targetCanvas.height = 2000;
     this._targetCanvas = targetCanvas;
 
-    const spritesheet = document.querySelector('img.spritesheet');
-    await new Promise((fulfill, reject) => {
-      spritesheet.onload = fulfill;
-      spritesheet.onerror = reject;
+    const { maker, spritesheet } = await FrameMaker.fromBraveFrontierUnit(850438, 'gl');
+    this._frameMaker = maker;
+    this._spritesheets = [spritesheet];
 
-      spritesheet.src = App.SAMPLE_URLS.anime;
-    });
-
-    this._currentAnimation = 'idle';
+    this._currentAnimation = 'move';
   }
 
   renderFrame (index, options = {}) {
@@ -60,7 +32,7 @@ export default class App {
     const context = this._targetCanvas.getContext('2d');
     context.clearRect(0, 0, this._targetCanvas.width, this._targetCanvas.height);
     this._frameMaker.drawFrame({
-      spritesheets: [document.querySelector('img.spritesheet')],
+      spritesheets: this._spritesheets,
       animationName: this._currentAnimation,
       animationIndex: isValidIndex ? frameToRender : 0,
       targetCanvas: this._targetCanvas,
