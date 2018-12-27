@@ -1,4 +1,5 @@
 import resolve from 'rollup-plugin-node-resolve';
+import alias from 'rollup-plugin-alias';
 
 export default {
   input: 'js/app.js',
@@ -8,5 +9,10 @@ export default {
     name: 'App',
     sourcemap: true,
   },
-  plugins: [resolve()]
+  plugins: [
+    alias({
+      vue: 'node_modules/vue/dist/vue.esm.browser.min.js',
+    }),
+    resolve(),
+  ],
 };

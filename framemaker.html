@@ -5,33 +5,142 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>FrameMaker</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script src="js/app-bundle.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <!-- <link rel="stylesheet" href="https://unpkg.com/material-components-web@0.42.1/dist/material-components-web.min.css"> -->
     <style>
         body {
-            background: grey;
+            background: aliceblue;
         }
+    
         canvas {
             border: 1px solid black;
         }
+
+        .container {
+            display: flex;
+            align-items: center;
+        }
+
+        .container#app {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .container#app > .section {
+            padding-top: 0;
+        }
+
+        .container#app > .section > .card {
+            margin-bottom: 0;
+        }
+
+        .container > * {
+            flex: 1 1 100%;
+        }
+
+        .container#inputOptions {
+            flex-wrap: wrap;
+            margin: 0;
+        }
+
+        .container#inputOptions > section {
+            flex-basis: 50%;
+            display: flex;
+        }
+
+        a {
+            text-align: center;
+        }
+
+        .card-action a.disabled {
+            pointer-events: none;
+            cursor: not-allowed;
+        }
+
     </style>
 </head>
 <body>
+    <div id="app" class="container">
+        <div class="section">
+            <div class="container" style="flex-flow: column wrap;">
+                <h4 style="text-align: center;">BFFrameAnimator-js</h4>
+                <div class="container" style="margin: 0; justify-content: center;">
+                    <a href="https://github.com/BluuArc/BFFrameAnimator" target="_blank" rel="noopener">
+                        <h6>Original Java Version</h6>
+                    </a>
+                    <a href="https://github.com/BluuArc/BFFrameAnimator-js" target="_blank" rel="noopener">
+                        <h6>GitHub Repository</h6>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="section">
+            <div class="card">
+                <div class="card-content">
+                    <span class="card-title">Options</span>
+                    <section class="container" id="inputOptions">
+                        <section>
+                            <div style="flex: 1 0 auto;">
+                                <span>Unit ID</span>
+                                <input type="text" v-model="unitId" id="unitId" class="browser-default" placeholder="BF Unit ID">
+                            </div>
+                        </section>
+                        <section>
+                            <span>Server</span>
+                            <div style="display: flex; flex: 1 1 auto;">
+                                <label v-for="server in ['gl', 'eu', 'jp']" style="flex: 1 0 33%;">
+                                    <input name="server" type="radio" v-model="activeServer" :value="server">
+                                    <span v-text="server.toUpperCase()"></span>
+                                </label>
+                            </div>
+                        </section>
+                        <section>
+                            <div style="flex: 1 0 100%; margin-top: 2em;">
+                                <label style="display: flex; align-items: center;">
+                                    <input style="flex: none;" type="checkbox" v-model="doTrim" id="doTrim">
+                                    <span style="flex: 1 1 auto; height: auto;">Trim Whitespace (may clip out too much on some animations)</span>
+                                </label>
+                            </div>
+                        </section>
+                    </section>
+                </div>
+                <div class="card-action container" style="margin: 0; justify-content: space-between; width: 100%;">
+                    <a
+                        @click="generateAnimation"
+                        href="#"
+                        :class="{ 'blue-text text-darken-2': !isLoading, 'grey-text text-darken-2': isLoading }"
+                        style="flex: none;">
+                        Generate
+                    </a>
+                    <span style="text-align: right;" v-if="formMessage" v-html="formMessage"></span>
+                </div>
+            </div>
+        </div>
+        <div class="section">
+            <div class="card">
+                <div class="card-content">
+                    <span class="card-title">Animation</span>
+                    animation and animation controls here
+                </div>
+            </div>
+        </div>
+    </div>
     <canvas id="target"></canvas>
-    <img class="spritesheet">
+    <script src="js/app-bundle.js"></script>
     <script>
+        app = new App();
         (() => {
-            app = new App();
-            app.init()
-                .then(() => {
-                    console.log('ready');
-                    app.renderFrame(0);
-                    // app.frameMaker.drawFrame({
-                    //     spritesheets: [document.querySelector('img.spritesheet')],
-                    //     animationName: 'idle',
-                    //     animationIndex: 4,
-                    //     targetCanvas: document.querySelector('canvas#target')
-                    // });
-                }).catch(err => console.error(err));
+            // app.init()
+            //     .then(() => {
+            //         console.log('ready');
+            //         app.renderFrame(0);
+            //         // app.frameMaker.drawFrame({
+            //         //     spritesheets: [document.querySelector('img.spritesheet')],
+            //         //     animationName: 'idle',
+            //         //     animationIndex: 4,
+            //         //     targetCanvas: document.querySelector('canvas#target')
+            //         // });
+            //     }).catch(err => console.error(err));
         })();
     </script>
 </body>
