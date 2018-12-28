@@ -26,22 +26,24 @@ var App = (function () {
         yMax = Math.max(yMax, part.position.y + h + yOffset);
       });
     });
-    let xOffset, yOffset;
+    let left = 0, top = 0,
+      width = xMax - xMin,
+      height = yMax - yMin;
     if (!doTrim) {
-      xOffset = Math.ceil((xMax - xMin) * 0.125);
-      yOffset = Math.ceil((yMax - yMin) * 0.20);
+      left = -(xMax + xMin) / 4; // center horizontally
+      top = -(yMax + yMin) / 4; // center vertically
     } else {
-      xOffset = (xMax - xMin) / 2;
-      yOffset = (yMax - yMin) / 2;
+      left = -(xMax + xMin) / 2;
+      top = -(yMax + yMin) / 2;
     }
     return {
       x: [xMin, xMax],
       y: [yMin, yMax],
-      w: xMax - xMin,
-      h: yMax - yMin,
+      w: width,
+      h: height,
       offset: { // equivalent to padding
-        x: xOffset,
-        y: yOffset,
+        left,
+        top,
       },
     };
   });
@@ -183,17 +185,19 @@ var App = (function () {
     async addAnimation (key = 'name', csv = [], doTrim) {
       const cgsFrames = this._processCgs(csv);
       const lowercaseKey = key.toLowerCase();
+      const trim = doTrim === undefined ?
+        (!lowercaseKey.includes('atk') && !lowercaseKey.includes('xbb')) :
+        doTrim;
       const bounds = await calculateAnimationBounds(
         cgsFrames,
         this._frames,
-        doTrim === undefined
-          ? (!lowercaseKey.includes('atk') && !lowercaseKey.includes('xbb'))
-          : doTrim
+        trim,
       );
 
       this._animations[key] = {
         frames: cgsFrames,
         bounds,
+        trimmed: trim,
         cachedCanvases: {},
       };
     }
@@ -203,7 +207,18 @@ var App = (function () {
     }
 
     get loadedAnimations () {
-      return Object.keys(this._animations);
+      const preferredOrder = ['idle', 'move', 'atk', 'skill'];
+      return Object.keys(this._animations).sort((a, b) => {
+        // order so that preferred order comes first and unknown comes last
+        const [aIndex, bIndex] = [preferredOrder.indexOf(a), preferredOrder.indexOf(b)];
+        if (aIndex === bIndex) {
+          return a < b ? -1 : 1;
+        } else if (aIndex >= 0 && bIndex >= 0) {
+          return aIndex - bIndex;
+        } else {
+          return aIndex < 0 ? 1 : -1;
+        }
+      });
     }
 
     _waitForIdleFrame () {
@@ -239,7 +254,7 @@ var App = (function () {
       const cggFrame = this._frames[cgsFrame.frameIndex];
       // console.debug(`drawing frame [cgs:${animationIndex}, cgg:${cgsFrame.frameIndex}]`, cggFrame);
 
-      const tempCanvasSize = (spritesheets.reduce((acc, val) => Math.max(acc, val.width, val.height), Math.max(bounds.w + bounds.offset.x * 2, bounds.h + bounds.offset.y * 2))) * 2;
+      const tempCanvasSize = (spritesheets.reduce((acc, val) => Math.max(acc, val.width, val.height), Math.max(bounds.w + Math.abs(bounds.offset.left) * 2, bounds.h + Math.abs(bounds.offset.top) * 2))) * 2;
       // used as a temp canvas for rotating/flipping parts
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = tempCanvasSize;
@@ -251,8 +266,8 @@ var App = (function () {
         frameCanvas.width = referenceCanvas.width;
         frameCanvas.height = referenceCanvas.height;
       } else {
-        frameCanvas.width = bounds.w + (bounds.offset.x * 2);
-        frameCanvas.height = bounds.h + (bounds.offset.y * 2);
+        frameCanvas.width = bounds.w;
+        frameCanvas.height = bounds.h;
       }
       frameCanvas.dataset.delay = cgsFrame.frameDelay;
 
@@ -316,13 +331,20 @@ var App = (function () {
         // const bodyCanvas = document.createElement('canvas');
         // bodyCanvas.width = tempCanvas.width;
         // bodyCanvas.height = tempCanvas.height;
-        // bodyCanvas.dataset.cgsIndex = cggFrame.parts.length - 1 - i;
+        // bodyCanvas.dataset.cgsIndex = cggFrame.parts.length - 1;
         // const bodyContext = bodyCanvas.getContext('2d');
         // bodyContext.globalAlpha = part.opacity / 100;
         // bodyContext.drawImage(tempCanvas, 0, 0);
         // bodyContext.beginPath();
         // bodyContext.rect(tempCanvas.width / 2 - sourceWidth / 2, tempCanvas.height / 2 - sourceHeight / 2, sourceWidth, sourceHeight);
         // bodyContext.stroke();
+        // bodyContext.fillStyle = 'red';
+        // bodyContext.beginPath();
+        // bodyContext.ellipse(
+        //   tempCanvas.width / 2, tempCanvas.height / 2,
+        //   5, 5, Math.PI / 2, 0, 2 * Math.PI
+        // );
+        // bodyContext.fill();
         // document.body.appendChild(bodyCanvas);
 
         // copy part result to frame canvas
@@ -340,7 +362,7 @@ var App = (function () {
           tempCanvas,
           0, 0, // start at top left of temp canvas
           tempCanvas.width, tempCanvas.height,
-          targetX + bounds.offset.x, targetY + bounds.offset.y,
+          targetX + bounds.offset.left, targetY + bounds.offset.top,
           tempCanvas.width, tempCanvas.height,
         );
         frameContext.restore();
@@ -350,11 +372,19 @@ var App = (function () {
         frameContext.save();
         frameContext.strokeStyle = 'red';
         frameContext.beginPath();
-        frameContext.rect(
-          origin.x + bounds.x[0],
-          origin.y + bounds.y[0],
-          bounds.w + bounds.offset.x * 2, bounds.h + bounds.offset.y * 2,
-        );
+        if (!animationEntry.trimmed) {
+          frameContext.rect(
+            origin.x + bounds.x[0] + bounds.offset.left * 3,
+            origin.y + bounds.y[0] + bounds.offset.top * 3,
+            bounds.w - bounds.offset.left * 2, bounds.h - bounds.offset.top * 2,
+          );
+        } else {
+          frameContext.rect(
+            origin.x + bounds.x[0] + bounds.offset.left,
+            origin.y + bounds.y[0] + bounds.offset.top,
+            bounds.w, bounds.h,
+          );
+        }
         frameContext.stroke();
         frameContext.restore();
       }
@@ -409,7 +439,9 @@ var App = (function () {
         watch: {
           activeAnimation: (newValue) => {
             this._currentAnimation = newValue;
-            this.renderFrame(0);
+            if (newValue) {
+              this.renderFrame(0);
+            }
           },
         },
         methods: {
@@ -461,7 +493,8 @@ var App = (function () {
 
       this._vueData.animationReady = false;
       this._vueData.errorOccurred = false;
-      this._currentAnimation = '';
+      this._vueData.activeAnimation = '';
+      this._frameIndex = 0;
       this._setLog('Loading spritesheets and CSVs...', true);
       await this._vueApp.$nextTick();
       // load animation data
@@ -479,6 +512,7 @@ var App = (function () {
 
       // generate the animations
       const animationNames = this._frameMaker.loadedAnimations;
+      console.debug(animationNames);
       this._vueApp.animationNames = animationNames;
       try {
         for (const name of animationNames) {
@@ -491,7 +525,7 @@ var App = (function () {
               spritesheets: this._spritesheets,
               animationName: name,
               animationIndex: i,
-              drawFrameBounds: true,
+              drawFrameBounds: false, // set true for debugging
             });
           }
         }
@@ -505,6 +539,7 @@ var App = (function () {
 
       // notify that animations are finished
       this._vueData.animationReady = true;
+      this._vueData.activeAnimation = animationNames[0];
       this._setLog(`Successfully generated animation for ${this._vueData.unitId}`, false);
     }
 
@@ -516,6 +551,7 @@ var App = (function () {
       } else if (frameToRender >= animation.frames.length) {
         frameToRender -= animation.frames.length;
       }
+      console.debug(frameToRender, this._frameIndex);
       const isValidIndex = frameToRender < animation.frames.length && frameToRender >= 0;
 
       const frame = await this._frameMaker.getFrame({
@@ -526,14 +562,14 @@ var App = (function () {
       });
       console.debug(index, animation, frame);
       if (this._targetCanvas.width !== frame.width) {
-        this._targetCanvas.width = frame.width * 2;
+        this._targetCanvas.width = frame.width;
       }
       if (this._targetCanvas.height !== frame.height) {
-        this._targetCanvas.height = frame.height * 2;
+        this._targetCanvas.height = frame.height;
       }
       const context = this._targetCanvas.getContext('2d');
       context.clearRect(0, 0, this._targetCanvas.width, this._targetCanvas.height);
-      context.drawImage(frame, frame.width * 0.1, frame.width * 0.2);
+      context.drawImage(frame, 0, 0);
 
       // mark center of canvas
       // context.save();

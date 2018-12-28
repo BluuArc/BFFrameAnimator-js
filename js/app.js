@@ -29,7 +29,9 @@ export default class App {
       watch: {
         activeAnimation: (newValue) => {
           this._currentAnimation = newValue;
-          this.renderFrame(0);
+          if (newValue) {
+            this.renderFrame(0);
+          }
         },
       },
       methods: {
@@ -81,7 +83,8 @@ export default class App {
 
     this._vueData.animationReady = false;
     this._vueData.errorOccurred = false;
-    this._currentAnimation = '';
+    this._vueData.activeAnimation = '';
+    this._frameIndex = 0;
     this._setLog('Loading spritesheets and CSVs...', true);
     await this._vueApp.$nextTick();
     // load animation data
@@ -99,6 +102,7 @@ export default class App {
 
     // generate the animations
     const animationNames = this._frameMaker.loadedAnimations;
+    console.debug(animationNames);
     this._vueApp.animationNames = animationNames;
     try {
       for (const name of animationNames) {
@@ -111,7 +115,7 @@ export default class App {
             spritesheets: this._spritesheets,
             animationName: name,
             animationIndex: i,
-            drawFrameBounds: true,
+            drawFrameBounds: false, // set true for debugging
           });
         }
       }
@@ -125,6 +129,7 @@ export default class App {
 
     // notify that animations are finished
     this._vueData.animationReady = true;
+    this._vueData.activeAnimation = animationNames[0];
     this._setLog(`Successfully generated animation for ${this._vueData.unitId}`, false);
   }
 
@@ -136,6 +141,7 @@ export default class App {
     } else if (frameToRender >= animation.frames.length) {
       frameToRender -= animation.frames.length;
     }
+    console.debug(frameToRender, this._frameIndex);
     const isValidIndex = frameToRender < animation.frames.length && frameToRender >= 0;
 
     const frame = await this._frameMaker.getFrame({
@@ -146,14 +152,14 @@ export default class App {
     });
     console.debug(index, animation, frame);
     if (this._targetCanvas.width !== frame.width) {
-      this._targetCanvas.width = frame.width * 2;
+      this._targetCanvas.width = frame.width;
     }
     if (this._targetCanvas.height !== frame.height) {
-      this._targetCanvas.height = frame.height * 2;
+      this._targetCanvas.height = frame.height;
     }
     const context = this._targetCanvas.getContext('2d');
     context.clearRect(0, 0, this._targetCanvas.width, this._targetCanvas.height);
-    context.drawImage(frame, frame.width * 0.1, frame.width * 0.2);
+    context.drawImage(frame, 0, 0);
 
     // mark center of canvas
     // context.save();

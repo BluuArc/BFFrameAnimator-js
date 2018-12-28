@@ -13,9 +13,9 @@
             background: aliceblue;
         }
     
-        canvas {
+        /* canvas {
             border: 1px solid black;
-        }
+        } */
 
         .container {
             display: flex;
@@ -137,13 +137,13 @@
                             <canvas id="target"></canvas>
                         </section>
                         <section class="container" style="margin: 0; width: 100%;">
-                            <a :class="{ 'btn black-text': true, disabled: !activeAnimation }" @click="renderFrame(getFrameIndex() - 1)">
+                            <a :class="{ 'btn black-text': true, disabled: !activeAnimation }" @click="renderFrame(getFrameIndex() - 2)">
                                 <i class="fas fa-step-backward"></i>
                             </a>
                             <a :class="{ 'btn black-text': true, disabled: !activeAnimation }" @click="isPlaying = !isPlaying;">
                                 <i :class="{ fas: true, 'fa-play': !isPlaying, 'fa-pause': isPlaying }"></i>
                             </a>
-                            <a :class="{ 'btn black-text': true, disabled: !activeAnimation }" @click="renderFrame(getFrameIndex() + 1)">
+                            <a :class="{ 'btn black-text': true, disabled: !activeAnimation }" @click="renderFrame()">
                                 <i class="fas fa-step-forward"></i>
                             </a>
                         </section>
