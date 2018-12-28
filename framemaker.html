@@ -6,7 +6,8 @@
     <title>FrameMaker</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
-    <!-- <link rel="stylesheet" href="https://unpkg.com/material-components-web@0.42.1/dist/material-components-web.min.css"> -->
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css" integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/"
+        crossorigin="anonymous">
     <style>
         body {
             background: aliceblue;
@@ -104,7 +105,9 @@
                         </section>
                     </section>
                 </div>
-                <div class="card-action container" style="margin: 0; justify-content: space-between; width: 100%;">
+                <div
+                    :class="{ 'card-action container': true, 'grey lighten-3': isLoading, 'green lighten-4': !isLoading && animationReady, 'red lighten-4': !isLoading && errorOccurred }"
+                    style="margin: 0; justify-content: space-between; width: 100%;">
                     <a
                         @click="generateAnimation"
                         href="#"
@@ -120,12 +123,35 @@
             <div class="card">
                 <div class="card-content">
                     <span class="card-title">Animation</span>
-                    animation and animation controls here
+                    <span v-if="!animationReady">Generate an animation using the card above to be viewed here.</span>
+                    <div class="container" style="margin: 0; width: 100%; flex-direction: column;" v-show="animationReady">
+                        <section class="container" style="margin: 0; width: 100%;">
+                            <a  
+                                v-for="name in animationNames"
+                                :key="name"
+                                :class="{ 'btn black-text': true, 'blue lighten-4': activeAnimation === name, 'grey lighten-4': activeAnimation !== name }"
+                                v-text="name"
+                                @click="activeAnimation = name;"></a>
+                        </section>
+                        <section>
+                            <canvas id="target"></canvas>
+                        </section>
+                        <section class="container" style="margin: 0; width: 100%;">
+                            <a :class="{ 'btn black-text': true, disabled: !activeAnimation }" @click="renderFrame(getFrameIndex() - 1)">
+                                <i class="fas fa-step-backward"></i>
+                            </a>
+                            <a :class="{ 'btn black-text': true, disabled: !activeAnimation }" @click="isPlaying = !isPlaying;">
+                                <i :class="{ fas: true, 'fa-play': !isPlaying, 'fa-pause': isPlaying }"></i>
+                            </a>
+                            <a :class="{ 'btn black-text': true, disabled: !activeAnimation }" @click="renderFrame(getFrameIndex() + 1)">
+                                <i class="fas fa-step-forward"></i>
+                            </a>
+                        </section>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    <canvas id="target"></canvas>
     <script src="js/app-bundle.js"></script>
     <script>
         app = new App();

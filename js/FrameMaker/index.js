@@ -13,18 +13,26 @@ const calculateAnimationBounds = greenlet(function (cgsEntry = [], frames = [], 
       xMin = Math.min(xMin, part.position.x - (doTrim ? 0 : w) - xOffset);
       yMin = Math.min(yMin, part.position.y - (doTrim ? 0 : h) - yOffset);
 
-      xMax = Math.max(xMax, part.position.x + (doTrim ? 0 : w) + xOffset);
-      yMax = Math.max(yMax, part.position.y + (doTrim ? 0 : h) + yOffset);
+      xMax = Math.max(xMax, part.position.x + w + xOffset);
+      yMax = Math.max(yMax, part.position.y + h + yOffset);
     });
   });
+  let xOffset, yOffset;
+  if (!doTrim) {
+    xOffset = Math.ceil((xMax - xMin) * 0.125);
+    yOffset = Math.ceil((yMax - yMin) * 0.20);
+  } else {
+    xOffset = (xMax - xMin) / 2;
+    yOffset = (yMax - yMin) / 2;
+  }
   return {
     x: [xMin, xMax],
     y: [yMin, yMax],
     w: xMax - xMin,
     h: yMax - yMin,
-    offset: { // relative to top left of screen; equivalent to padding
-      x: (xMax - xMin) * 0.125,
-      y: (yMax - yMin) * 0.20,
+    offset: { // equivalent to padding
+      x: xOffset,
+      y: yOffset,
     },
   };
 });
@@ -185,7 +193,21 @@ export default class FrameMaker {
     return this._animations[key];
   }
 
-  getFrame({
+  get loadedAnimations () {
+    return Object.keys(this._animations);
+  }
+
+  _waitForIdleFrame () {
+    return new Promise(fulfill => {
+      if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(fulfill);
+      } else {
+        setTimeout(fulfill, 1);
+      }
+    });
+  }
+
+  async getFrame({
     spritesheets = [], // array of img elements containing sprite sheets
     animationName = 'name',
     animationIndex = -1,
@@ -220,9 +242,10 @@ export default class FrameMaker {
       frameCanvas.width = referenceCanvas.width;
       frameCanvas.height = referenceCanvas.height;
     } else {
-      frameCanvas.width = bounds.w + bounds.offset.x * 2;
-      frameCanvas.height = bounds.h + bounds.offset.y * 2;
+      frameCanvas.width = bounds.w + (bounds.offset.x * 2);
+      frameCanvas.height = bounds.h + (bounds.offset.y * 2);
     }
+    frameCanvas.dataset.delay = cgsFrame.frameDelay;
 
     const origin = {
       x: frameCanvas.width / 2,
@@ -231,7 +254,9 @@ export default class FrameMaker {
     const tempContext = tempCanvas.getContext('2d');
     const frameContext = frameCanvas.getContext('2d');
     // render each part in reverse order onto the frameCanvas
-    cggFrame.parts.slice().reverse().forEach((part) => {
+    for (let partIndex = cggFrame.parts.length - 1; partIndex >= 0; --partIndex) {
+      const part = cggFrame.parts[partIndex];
+      await this._waitForIdleFrame(); // only generate frames between idle periods
       const sourceWidth = part.img.width, sourceHeight = part.img.height;
       tempContext.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
       tempContext.globalAlpha = part.opacity / 100;
@@ -260,6 +285,7 @@ export default class FrameMaker {
 
       // blend code based off of this: http://pastebin.com/vXc0yNRh
       if (part.blendMode === 1) {
+        // await this._waitForIdleFrame(); // only generate frames between idle periods
         const imgData = tempContext.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
         const pixelData = imgData.data;
         for (let p = 0; p < pixelData.length; p += 4) {
@@ -291,6 +317,7 @@ export default class FrameMaker {
       // document.body.appendChild(bodyCanvas);
 
       // copy part result to frame canvas
+      // await this._waitForIdleFrame(); // only generate frames between idle periods
       frameContext.save();
       const targetX = origin.x + part.position.x + sourceWidth / 2 - tempCanvasSize / 2,
         targetY = origin.y + part.position.y + sourceHeight / 2 - tempCanvasSize / 2;
@@ -308,9 +335,11 @@ export default class FrameMaker {
         tempCanvas.width, tempCanvas.height,
       );
       frameContext.restore();
-    });
+    }
     if (drawFrameBounds) {
-      console.debug('drawing frame bounds', bounds);
+      console.debug('drawing frame bounds', bounds, origin);
+      frameContext.save();
+      frameContext.strokeStyle = 'red';
       frameContext.beginPath();
       frameContext.rect(
         origin.x + bounds.x[0],
@@ -318,20 +347,22 @@ export default class FrameMaker {
         bounds.w + bounds.offset.x * 2, bounds.h + bounds.offset.y * 2,
       );
       frameContext.stroke();
+      frameContext.restore();
     }
     cachedCanvases[animationIndex] = frameCanvas;
     tempCanvas.remove();
+    console.debug(bounds, frameCanvas);
     return frameCanvas;
   }
 
-  drawFrame ({
+  async drawFrame ({
     spritesheets = [], // array of img elements containing sprite sheets
     animationName = 'name', animationIndex = -1,
     targetCanvas = document.createElement('canvas'),
     forceRedraw = false,
     drawFrameBounds = false,
   }) {
-    const frameCanvas = this.getFrame({
+    const frameCanvas = await this.getFrame({
       spritesheets,
       animationName,
       animationIndex,

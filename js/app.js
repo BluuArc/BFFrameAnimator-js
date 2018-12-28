@@ -7,7 +7,7 @@ export default class App {
   constructor () {
     this._frameMaker = null;
     this._targetCanvas = null;
-    this._frameIndex = -1;
+    this._frameIndex = 0;
     this._spritesheets = [];
     this._currentAnimation = null;
 
@@ -18,12 +18,24 @@ export default class App {
       activeServer: 'gl',
       doTrim: false,
       formMessage: 'Input your options above then press "Generate" to start generating an animation.',
+      errorOccurred: false,
+      activeAnimation: '',
+      animationNames: [],
+      isPlaying: false,
     };
     this._vueApp = new Vue({
       el: '#app',
       data: this._vueData,
+      watch: {
+        activeAnimation: (newValue) => {
+          this._currentAnimation = newValue;
+          this.renderFrame(0);
+        },
+      },
       methods: {
         generateAnimation: () => this.generateAnimation(),
+        getFrameIndex: () => this._frameIndex,
+        renderFrame: (...args) => this.renderFrame(...args),
       },
     });
 
@@ -47,16 +59,30 @@ export default class App {
     return this._vueData.unitId.length > 0 && !isNaN(this._vueData.unitId) && ['gl', 'eu', 'jp'].includes(this._vueData.activeServer);
   }
 
+  _setLog (message = '', isLoading) {
+    // eslint-disable-next-line no-console
+    console.debug('[LOG]', message);
+    this._vueData.formMessage = message;
+    if (isLoading !== undefined) {
+      this._vueData.isLoading = !!isLoading;
+    }
+  }
+
   async generateAnimation () {
+    if (this._vueData.isLoading) {
+      return;
+    }
     console.debug(this._vueData);
     if (!this._formIsValid) {
+      this._vueData.errorOccurred = true;
       this._vueData.formMessage = '<b>ERROR:</b> Form input isn\'t valid. Please try again.';
       return;
     }
 
     this._vueData.animationReady = false;
-    this._vueData.isLoading = true;
-    this._vueData.formMessage = 'Loading spritesheets and CSVs...';
+    this._vueData.errorOccurred = false;
+    this._currentAnimation = '';
+    this._setLog('Loading spritesheets and CSVs...', true);
     await this._vueApp.$nextTick();
     // load animation data
     try {
@@ -66,43 +92,76 @@ export default class App {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error(err);
-      this._vueData.isLoading = false;
-      this._vueData.formMessage = `Error getting animation data for ${this._vueData.unitId}`;
+      this._vueData.errorOccurred = true;
+      this._setLog(`Error getting animation data for ${this._vueData.unitId}`, false);
       return;
     }
 
     // generate the animations
-    // this._vueData.formMessage = 'Loading spritesheets and CSVs...';
-    // await this._vueApp.$nextTick();
+    const animationNames = this._frameMaker.loadedAnimations;
+    this._vueApp.animationNames = animationNames;
+    try {
+      for (const name of animationNames) {
+        const animation = this._frameMaker.getAnimation(name);
+        const numFrames = animation.frames.length;
+        for (let i = 0; i < numFrames; ++i) {
+          this._setLog(`Generating frames for ${name} [${(i+1).toString().padStart(numFrames.toString().length, '0')}/${numFrames}]...`);
+          // await this._waitForIdleFrame();
+          await this._frameMaker.getFrame({
+            spritesheets: this._spritesheets,
+            animationName: name,
+            animationIndex: i,
+            drawFrameBounds: true,
+          });
+        }
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(err);
+      this._vueData.errorOccurred = true;
+      this._setLog(`Error getting animation data for ${this._vueData.unitId}`, false);
+      return;
+    }
 
     // notify that animations are finished
     this._vueData.animationReady = true;
-    this._vueData.isLoading = false;
-    this._vueData.formMessage = `Generated animation for ${this._vueData.unitId}`;
+    this._setLog(`Successfully generated animation for ${this._vueData.unitId}`, false);
   }
 
-  renderFrame (index, options = {}) {
-    const frameToRender = !isNaN(index) ? +index : this._frameIndex;
+  async renderFrame (index, options = {}) {
     const animation = this._frameMaker.getAnimation(this._currentAnimation);
+    let frameToRender = !isNaN(index) ? +index : this._frameIndex;
+    if (frameToRender < 0) {
+      frameToRender += animation.frames.length;
+    } else if (frameToRender >= animation.frames.length) {
+      frameToRender -= animation.frames.length;
+    }
     const isValidIndex = frameToRender < animation.frames.length && frameToRender >= 0;
 
-    const context = this._targetCanvas.getContext('2d');
-    context.clearRect(0, 0, this._targetCanvas.width, this._targetCanvas.height);
-    this._frameMaker.drawFrame({
+    const frame = await this._frameMaker.getFrame({
       spritesheets: this._spritesheets,
       animationName: this._currentAnimation,
       animationIndex: isValidIndex ? frameToRender : 0,
-      targetCanvas: this._targetCanvas,
       ...options,
     });
+    console.debug(index, animation, frame);
+    if (this._targetCanvas.width !== frame.width) {
+      this._targetCanvas.width = frame.width * 2;
+    }
+    if (this._targetCanvas.height !== frame.height) {
+      this._targetCanvas.height = frame.height * 2;
+    }
+    const context = this._targetCanvas.getContext('2d');
+    context.clearRect(0, 0, this._targetCanvas.width, this._targetCanvas.height);
+    context.drawImage(frame, frame.width * 0.1, frame.width * 0.2);
 
     // mark center of canvas
-    context.save();
-    context.fillStyle = 'red';
-    context.beginPath();
-    context.ellipse(this._targetCanvas.width / 2, this._targetCanvas.height / 2, 3, 3, Math.PI / 2, 0, Math.PI * 2);
-    context.fill();
-    context.restore();
+    // context.save();
+    // context.fillStyle = 'red';
+    // context.beginPath();
+    // context.ellipse(this._targetCanvas.width / 2, this._targetCanvas.height / 2, 3, 3, Math.PI / 2, 0, Math.PI * 2);
+    // context.fill();
+    // context.restore();
   
     this._frameIndex = (frameToRender + 1 < animation.frames.length && frameToRender >= 0) ? frameToRender + 1 : 0;
   }
