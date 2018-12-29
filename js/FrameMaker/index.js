@@ -212,6 +212,11 @@ export default class FrameMaker {
     });
   }
 
+  getNumberOfFramesForAnimation (name = 'name') {
+    const animation = this._animations[name];
+    return animation ? animation.frames.length : 0;
+  }
+
   _waitForIdleFrame () {
     return new Promise(fulfill => {
       if ('requestIdleCallback' in window) {

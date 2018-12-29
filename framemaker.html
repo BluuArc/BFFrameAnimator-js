@@ -137,13 +137,13 @@
                             <canvas id="target"></canvas>
                         </section>
                         <section class="container" style="margin: 0; width: 100%;">
-                            <a :class="{ 'btn black-text': true, disabled: !activeAnimation }" @click="renderFrame(getFrameIndex() - 2)">
+                            <a :class="{ 'btn black-text': true, disabled: !activeAnimation || isPlaying || numFrames < 2 }" @click="renderFrame(getFrameIndex() - 2)">
                                 <i class="fas fa-step-backward"></i>
                             </a>
-                            <a :class="{ 'btn black-text': true, disabled: !activeAnimation }" @click="isPlaying = !isPlaying;">
+                            <a :class="{ 'btn black-text': true, disabled: !activeAnimation || numFrames < 2 }" @click="isPlaying = !isPlaying;">
                                 <i :class="{ fas: true, 'fa-play': !isPlaying, 'fa-pause': isPlaying }"></i>
                             </a>
-                            <a :class="{ 'btn black-text': true, disabled: !activeAnimation }" @click="renderFrame()">
+                            <a :class="{ 'btn black-text': true, disabled: !activeAnimation || isPlaying || numFrames < 2 }" @click="renderFrame()">
                                 <i class="fas fa-step-forward"></i>
                             </a>
                         </section>

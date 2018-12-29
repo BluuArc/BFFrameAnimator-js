@@ -221,6 +221,11 @@ var App = (function () {
       });
     }
 
+    getNumberOfFramesForAnimation (name = 'name') {
+      const animation = this._animations[name];
+      return animation ? animation.frames.length : 0;
+    }
+
     _waitForIdleFrame () {
       return new Promise(fulfill => {
         if ('requestIdleCallback' in window) {
@@ -432,6 +437,7 @@ var App = (function () {
         activeAnimation: '',
         animationNames: [],
         isPlaying: false,
+        numFrames: 0,
       };
       this._vueApp = new rn({
         el: '#app',
@@ -439,6 +445,7 @@ var App = (function () {
         watch: {
           activeAnimation: (newValue) => {
             this._currentAnimation = newValue;
+            this._vueData.numFrames = this._frameMaker.getNumberOfFramesForAnimation(newValue);
             if (newValue) {
               this.renderFrame(0);
             }

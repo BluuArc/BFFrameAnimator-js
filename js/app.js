@@ -22,6 +22,7 @@ export default class App {
       activeAnimation: '',
       animationNames: [],
       isPlaying: false,
+      numFrames: 0,
     };
     this._vueApp = new Vue({
       el: '#app',
@@ -29,6 +30,7 @@ export default class App {
       watch: {
         activeAnimation: (newValue) => {
           this._currentAnimation = newValue;
+          this._vueData.numFrames = this._frameMaker.getNumberOfFramesForAnimation(newValue);
           if (newValue) {
             this.renderFrame(0);
           }
