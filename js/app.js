@@ -10,6 +10,8 @@ export default class App {
     this._frameIndex = 0;
     this._spritesheets = [];
     this._currentAnimation = null;
+    this._raf = null;
+    this._framesUntilRedraw = 0;
 
     this._vueData = {
       isLoading: false,
@@ -35,11 +37,20 @@ export default class App {
             this.renderFrame(0);
           }
         },
+        isPlaying: (newValue) => {
+          if (this._raf) {
+            cancelAnimationFrame(this._raf);
+          }
+          if (newValue) {
+            this.animate();
+          }
+        },
       },
       methods: {
         generateAnimation: () => this.generateAnimation(),
         getFrameIndex: () => this._frameIndex,
         renderFrame: (...args) => this.renderFrame(...args),
+        animate: () => this.animate(),
       },
     });
 
@@ -84,6 +95,7 @@ export default class App {
     }
 
     this._vueData.animationReady = false;
+    this._vueData.isPlaying = false;
     this._vueData.errorOccurred = false;
     this._vueData.activeAnimation = '';
     this._frameIndex = 0;
@@ -143,7 +155,7 @@ export default class App {
     } else if (frameToRender >= animation.frames.length) {
       frameToRender -= animation.frames.length;
     }
-    console.debug(frameToRender, this._frameIndex);
+    // console.debug(frameToRender, this._frameIndex);
     const isValidIndex = frameToRender < animation.frames.length && frameToRender >= 0;
 
     const frame = await this._frameMaker.getFrame({
@@ -152,7 +164,7 @@ export default class App {
       animationIndex: isValidIndex ? frameToRender : 0,
       ...options,
     });
-    console.debug(index, animation, frame);
+    // console.debug(index, animation, frame);
     if (this._targetCanvas.width !== frame.width) {
       this._targetCanvas.width = frame.width;
     }
@@ -172,6 +184,20 @@ export default class App {
     // context.restore();
   
     this._frameIndex = (frameToRender + 1 < animation.frames.length && frameToRender >= 0) ? frameToRender + 1 : 0;
+    return frame;
+  }
+
+  async animate () {
+    if (this._framesUntilRedraw <= 0) {
+      const frame = await this.renderFrame();
+      this._framesUntilRedraw = frame.dataset.delay;
+    } else {
+      this._framesUntilRedraw--;
+    }
+
+    if (this._vueData.isPlaying) {
+      this._raf = requestAnimationFrame(() => this.animate());
+    }
   }
 
   get frameMaker () {

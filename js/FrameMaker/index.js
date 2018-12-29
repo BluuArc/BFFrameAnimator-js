@@ -386,7 +386,7 @@ export default class FrameMaker {
     }
     cachedCanvases[animationIndex] = frameCanvas;
     tempCanvas.remove();
-    console.debug(bounds, frameCanvas);
+    // console.debug(bounds, frameCanvas);
     return frameCanvas;
   }
 
