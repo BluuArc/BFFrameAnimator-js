@@ -7,7 +7,6 @@ export default class App {
   constructor () {
     this._frameMaker = null;
     this._targetCanvas = null;
-    this._frameIndex = 0;
     this._spritesheets = [];
     this._currentAnimation = null;
     this._raf = null;
@@ -25,6 +24,7 @@ export default class App {
       animationNames: [],
       isPlaying: false,
       numFrames: 0,
+      frameIndex: 0,
     };
     this._vueApp = new Vue({
       el: '#app',
@@ -34,7 +34,7 @@ export default class App {
           this._currentAnimation = newValue;
           this._vueData.numFrames = this._frameMaker.getNumberOfFramesForAnimation(newValue);
           if (newValue) {
-            this.renderFrame(0);
+            this.renderFrame(-Infinity);
           }
         },
         isPlaying: (newValue) => {
@@ -48,7 +48,6 @@ export default class App {
       },
       methods: {
         generateAnimation: () => this.generateAnimation(),
-        getFrameIndex: () => this._frameIndex,
         renderFrame: (...args) => this.renderFrame(...args),
         animate: () => this.animate(),
       },
@@ -98,7 +97,7 @@ export default class App {
     this._vueData.isPlaying = false;
     this._vueData.errorOccurred = false;
     this._vueData.activeAnimation = '';
-    this._frameIndex = 0;
+    this._vueData.frameIndex = 0;
     this._setLog('Loading spritesheets and CSVs...', true);
     await this._vueApp.$nextTick();
     // load animation data
@@ -149,7 +148,7 @@ export default class App {
 
   async renderFrame (index, options = {}) {
     const animation = this._frameMaker.getAnimation(this._currentAnimation);
-    let frameToRender = !isNaN(index) ? +index : this._frameIndex;
+    let frameToRender = !isNaN(index) ? +index : this._vueData.frameIndex;
     if (frameToRender < 0) {
       frameToRender += animation.frames.length;
     } else if (frameToRender >= animation.frames.length) {
@@ -167,9 +166,11 @@ export default class App {
     // console.debug(index, animation, frame);
     if (this._targetCanvas.width !== frame.width) {
       this._targetCanvas.width = frame.width;
+      this._targetCanvas.style.width = `${frame.width}px`;
     }
     if (this._targetCanvas.height !== frame.height) {
       this._targetCanvas.height = frame.height;
+      this._targetCanvas.style.height = `${frame.height}px`;
     }
     const context = this._targetCanvas.getContext('2d');
     context.clearRect(0, 0, this._targetCanvas.width, this._targetCanvas.height);
@@ -183,7 +184,7 @@ export default class App {
     // context.fill();
     // context.restore();
   
-    this._frameIndex = (frameToRender + 1 < animation.frames.length && frameToRender >= 0) ? frameToRender + 1 : 0;
+    this._vueData.frameIndex = (frameToRender + 1 < animation.frames.length && frameToRender >= 0) ? frameToRender + 1 : 0;
     return frame;
   }
 

@@ -133,11 +133,17 @@
                                 v-text="name"
                                 @click="activeAnimation = name;"></a>
                         </section>
-                        <section>
-                            <canvas id="target"></canvas>
+                        <section v-show="activeAnimation" style="display: flex; min-width: 100%; flex-direction: column; align-items: center;">
+                            <canvas id="target" style="flex: none;"></canvas>
+                            <div class="container" style="margin: 0; width: 100%; align-items: center;">
+                                <span style="flex: none;" v-text="`${(frameIndex+1).toString().padStart(numFrames.toString().length, '0')}/${numFrames}`"></span>
+                                <div class="progress" style="margin: 0;">
+                                    <div class="determinate" :style="{ width: `${(frameIndex + 1) / numFrames * 100}%` }"></div>
+                                </div>
+                            </div>
                         </section>
                         <section class="container" style="margin: 0; width: 100%;">
-                            <a :class="{ 'btn black-text': true, disabled: !activeAnimation || isPlaying || numFrames < 2 }" @click="renderFrame(getFrameIndex() - 2)">
+                            <a :class="{ 'btn black-text': true, disabled: !activeAnimation || isPlaying || numFrames < 2 }" @click="renderFrame(frameIndex - 2)">
                                 <i class="fas fa-step-backward"></i>
                             </a>
                             <a :class="{ 'btn black-text': true, disabled: !activeAnimation || numFrames < 2 }" @click="isPlaying = !isPlaying;">
