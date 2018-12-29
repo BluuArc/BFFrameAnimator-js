@@ -62,11 +62,16 @@ export default class App {
     targetCanvas.height = 2000;
     this._targetCanvas = targetCanvas;
 
-    const { maker, spritesheet } = await FrameMaker.fromBraveFrontierUnit(850438, 'gl');
+    const { maker, spritesheet } = await FrameMaker.fromBraveFrontierUnit(820158, 'gl');
     this._frameMaker = maker;
     this._spritesheets = [spritesheet];
 
-    this._currentAnimation = 'move';
+    this._vueData.activeAnimation = 'atk';
+    await new Promise((fulfill) => {
+      setTimeout(() => {
+        this.renderFrame(36).then(fulfill);
+      }, 5000);
+    });
   }
 
   get _formIsValid () {
@@ -154,6 +159,7 @@ export default class App {
     } else if (frameToRender >= animation.frames.length) {
       frameToRender -= animation.frames.length;
     }
+    // console.debug(index, frameToRender);
     // console.debug(frameToRender, this._frameIndex);
     const isValidIndex = frameToRender < animation.frames.length && frameToRender >= 0;
 
@@ -186,6 +192,10 @@ export default class App {
   
     this._vueData.frameIndex = (frameToRender + 1 < animation.frames.length && frameToRender >= 0) ? frameToRender + 1 : 0;
     return frame;
+  }
+
+  async saveAnimation (animationName) {
+    console.debug('would have saved animation', animationName);
   }
 
   async animate () {

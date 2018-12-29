@@ -133,9 +133,9 @@
                                 v-text="name"
                                 @click="activeAnimation = name;"></a>
                         </section>
-                        <section v-show="activeAnimation" style="display: flex; min-width: 100%; flex-direction: column; align-items: center;">
+                        <section v-show="activeAnimation" style="display: flex; min-width: 100%; flex-direction: column; align-items: center; max-width: 100%;">
                             <canvas id="target" style="flex: none;"></canvas>
-                            <div class="container" style="margin: 0; width: 100%; align-items: center;">
+                            <div class="container" style="margin: 0; width: 100%; max-width: 100%; overflow-x: auto; align-items: center;">
                                 <span style="flex: none;" v-text="`${(frameIndex+1).toString().padStart(numFrames.toString().length, '0')}/${numFrames}`"></span>
                                 <div class="progress" style="margin: 0;">
                                     <div class="determinate" :style="{ width: `${(frameIndex + 1) / numFrames * 100}%` }"></div>
@@ -155,25 +155,24 @@
                         </section>
                     </div>
                 </div>
+                <div class="card-action" v-if="activeAnimation">
+                    <a @click="saveAnimation(activeAnimation)" href="#" :class="{ 'blue-text text-darken-2': !isLoading, 'grey-text text-darken-2': isLoading }">
+                        Download {{ activeAnimation }} Animation
+                    </a>
+                </div>
             </div>
         </div>
     </div>
     <script src="js/app-bundle.js"></script>
     <script>
         app = new App();
-        (() => {
-            // app.init()
-            //     .then(() => {
-            //         console.log('ready');
-            //         app.renderFrame(0);
-            //         // app.frameMaker.drawFrame({
-            //         //     spritesheets: [document.querySelector('img.spritesheet')],
-            //         //     animationName: 'idle',
-            //         //     animationIndex: 4,
-            //         //     targetCanvas: document.querySelector('canvas#target')
-            //         // });
-            //     }).catch(err => console.error(err));
-        })();
+        // (() => {
+        //     app.init()
+        //         .then(() => {
+        //             app._vueData.animationReady = true;
+        //             console.log('ready');
+        //         }).catch(err => console.error(err));
+        // })();
     </script>
 </body>
 </html>

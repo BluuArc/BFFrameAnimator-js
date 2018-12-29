@@ -257,7 +257,7 @@ var App = (function () {
 
       const cgsFrame = animationEntry.frames[animationIndex];
       const cggFrame = this._frames[cgsFrame.frameIndex];
-      // console.debug(`drawing frame [cgs:${animationIndex}, cgg:${cgsFrame.frameIndex}]`, cggFrame);
+      console.debug(`drawing frame [cgs:${animationIndex}, cgg:${cgsFrame.frameIndex}]`, cggFrame);
 
       const tempCanvasSize = (spritesheets.reduce((acc, val) => Math.max(acc, val.width, val.height), Math.max(bounds.w + Math.abs(bounds.offset.left) * 2, bounds.h + Math.abs(bounds.offset.top) * 2))) * 2;
       // used as a temp canvas for rotating/flipping parts
@@ -286,91 +286,101 @@ var App = (function () {
       for (let partIndex = cggFrame.parts.length - 1; partIndex >= 0; --partIndex) {
         const part = cggFrame.parts[partIndex];
         await this._waitForIdleFrame(); // only generate frames between idle periods
-        const sourceWidth = part.img.width, sourceHeight = part.img.height;
-        tempContext.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
-        tempContext.globalAlpha = part.opacity / 100;
+        try {
 
-        const flipX = part.flipType === 1 || part.flipType === 3;
-        const flipY = part.flipType === 2 || part.flipType === 3;
+          const sourceWidth = part.img.width, sourceHeight = part.img.height;
+          tempContext.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+          tempContext.globalAlpha = part.opacity / 100;
 
-        // draw part onto center of part canvas
-        tempContext.save(); 
-        let tempX = tempCanvas.width / 2 - sourceWidth / 2,
-          tempY = tempCanvas.height / 2 - sourceHeight / 2;
-        if (flipX || flipY) {
-          tempContext.translate(flipX ? sourceWidth : 0, flipY ? sourceHeight : 0);
-          tempContext.scale(flipX ? -1 : 1, flipY ? -1 : 1);
-          tempX -= (flipX ? tempCanvas.width - sourceWidth : 0);
-          tempY -= (flipY ? tempCanvas.height - sourceHeight : 0);
-        }
-        // from spritesheet to part canvas
-        tempContext.drawImage(
-          spritesheets[part.pageId],
-          part.img.x, part.img.y, sourceWidth, sourceHeight,
-          tempX, tempY,
-          sourceWidth, sourceHeight,
-        );
-        tempContext.restore();
+          const flipX = part.flipType === 1 || part.flipType === 3;
+          const flipY = part.flipType === 2 || part.flipType === 3;
 
-        // blend code based off of this: http://pastebin.com/vXc0yNRh
-        if (part.blendMode === 1) {
-          // await this._waitForIdleFrame(); // only generate frames between idle periods
-          const imgData = tempContext.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-          const pixelData = imgData.data;
-          for (let p = 0; p < pixelData.length; p += 4) {
-            let [r, g, b, a] = [pixelData[p], pixelData[p + 1], pixelData[p + 2], pixelData[p + 3]];
-            if (a > 0) {
-              const multiplier = 1 + (a * part.opacity / 100) / 255.0;
-              r = Math.min(255, Math.floor(r * multiplier));
-              g = Math.min(255, Math.floor(g * multiplier));
-              b = Math.min(255, Math.floor(b * multiplier));
-              a = Math.floor(((r + g + b) / 3) * part.opacity / 100);
-
-              [pixelData[p], pixelData[p + 1], pixelData[p + 2], pixelData[p + 3]] = [r, g, b, a];
-            }
+          // draw part onto center of part canvas
+          tempContext.save(); 
+          let tempX = tempCanvas.width / 2 - sourceWidth / 2,
+            tempY = tempCanvas.height / 2 - sourceHeight / 2;
+          if (flipX || flipY) {
+            tempContext.translate(flipX ? sourceWidth : 0, flipY ? sourceHeight : 0);
+            tempContext.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+            tempX -= (flipX ? tempCanvas.width - sourceWidth : 0);
+            tempY -= (flipY ? tempCanvas.height - sourceHeight : 0);
           }
-          tempContext.putImageData(imgData, 0, 0);
-        }
+          // from spritesheet to part canvas
+          tempContext.drawImage(
+            spritesheets[part.pageId],
+            part.img.x, part.img.y, sourceWidth, sourceHeight,
+            tempX, tempY,
+            sourceWidth, sourceHeight,
+          );
+          tempContext.restore();
 
-        // put part canvas on document body for debugging
-        // const bodyCanvas = document.createElement('canvas');
-        // bodyCanvas.width = tempCanvas.width;
-        // bodyCanvas.height = tempCanvas.height;
-        // bodyCanvas.dataset.cgsIndex = cggFrame.parts.length - 1;
-        // const bodyContext = bodyCanvas.getContext('2d');
-        // bodyContext.globalAlpha = part.opacity / 100;
-        // bodyContext.drawImage(tempCanvas, 0, 0);
-        // bodyContext.beginPath();
-        // bodyContext.rect(tempCanvas.width / 2 - sourceWidth / 2, tempCanvas.height / 2 - sourceHeight / 2, sourceWidth, sourceHeight);
-        // bodyContext.stroke();
-        // bodyContext.fillStyle = 'red';
-        // bodyContext.beginPath();
-        // bodyContext.ellipse(
-        //   tempCanvas.width / 2, tempCanvas.height / 2,
-        //   5, 5, Math.PI / 2, 0, 2 * Math.PI
-        // );
-        // bodyContext.fill();
-        // document.body.appendChild(bodyCanvas);
+          // blend code based off of this: http://pastebin.com/vXc0yNRh
+          if (part.blendMode === 1) {
+            // await this._waitForIdleFrame(); // only generate frames between idle periods
+            const imgData = tempContext.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const pixelData = imgData.data;
+            for (let p = 0; p < pixelData.length; p += 4) {
+              let [r, g, b, a] = [pixelData[p], pixelData[p + 1], pixelData[p + 2], pixelData[p + 3]];
+              if (a > 0) {
+                const multiplier = 1 + (a * part.opacity / 100) / 255.0;
+                r = Math.min(255, Math.floor(r * multiplier));
+                g = Math.min(255, Math.floor(g * multiplier));
+                b = Math.min(255, Math.floor(b * multiplier));
+                a = Math.floor(((r + g + b) / 3) * part.opacity / 100);
 
-        // copy part result to frame canvas
-        // await this._waitForIdleFrame(); // only generate frames between idle periods
-        frameContext.save();
-        const targetX = origin.x + part.position.x + sourceWidth / 2 - tempCanvasSize / 2,
-          targetY = origin.y + part.position.y + sourceHeight / 2 - tempCanvasSize / 2;
-        if (part.rotate !== 0) {
-          // console.debug('rotating', part.rotate);
-          frameContext.translate(origin.x + part.position.x + sourceWidth / 2, origin.y + part.position.y + sourceHeight / 2);
-          frameContext.rotate(-part.rotate * Math.PI / 180);
-          frameContext.translate(-(origin.x + part.position.x + sourceWidth / 2), -(origin.y + part.position.y + sourceHeight / 2));
+                [pixelData[p], pixelData[p + 1], pixelData[p + 2], pixelData[p + 3]] = [r, g, b, a];
+              }
+            }
+            tempContext.putImageData(imgData, 0, 0);
+          }
+
+          // put part canvas on document body for debugging
+          // if (animationIndex === 12) {
+          //   const bodyCanvas = document.createElement('canvas');
+          //   bodyCanvas.width = tempCanvas.width;
+          //   bodyCanvas.height = tempCanvas.height;
+          //   bodyCanvas.dataset.cgsIndex = cggFrame.parts.length - 1;
+          //   const bodyContext = bodyCanvas.getContext('2d');
+          //   bodyContext.globalAlpha = part.opacity / 100;
+          //   bodyContext.drawImage(tempCanvas, 0, 0);
+          //   bodyContext.beginPath();
+          //   bodyContext.rect(tempCanvas.width / 2 - sourceWidth / 2, tempCanvas.height / 2 - sourceHeight / 2, sourceWidth, sourceHeight);
+          //   bodyContext.stroke();
+          //   bodyContext.fillStyle = 'red';
+          //   bodyContext.beginPath();
+          //   bodyContext.ellipse(
+          //     tempCanvas.width / 2, tempCanvas.height / 2,
+          //     5, 5, Math.PI / 2, 0, 2 * Math.PI
+          //   );
+          //   bodyContext.fill();
+          //   document.body.appendChild(bodyCanvas);
+          // }
+
+          // copy part result to frame canvas
+          // await this._waitForIdleFrame(); // only generate frames between idle periods
+          frameContext.save();
+          const targetX = origin.x + part.position.x + sourceWidth / 2 - tempCanvasSize / 2,
+            targetY = origin.y + part.position.y + sourceHeight / 2 - tempCanvasSize / 2;
+          if (part.rotate !== 0) {
+            // console.debug('rotating', part.rotate);
+            frameContext.translate(origin.x + part.position.x + sourceWidth / 2 + bounds.offset.left, origin.y + part.position.y + sourceHeight / 2 + bounds.offset.top);
+            frameContext.rotate(-part.rotate * Math.PI / 180);
+            frameContext.translate(-(origin.x + part.position.x + sourceWidth / 2 + bounds.offset.left), -(origin.y + part.position.y + sourceHeight / 2 + bounds.offset.top));
+          }
+          frameContext.drawImage(
+            tempCanvas,
+            0, 0, // start at top left of temp canvas
+            tempCanvas.width, tempCanvas.height,
+            targetX + bounds.offset.left, targetY + bounds.offset.top,
+            tempCanvas.width, tempCanvas.height,
+          );
+          frameContext.restore();
+        } catch (err) {
+          /* eslint-disable no-console */
+          console.warn('skipping part due to error', partIndex, part);
+          console.error(err);
+          /* eslint-enable no-console */
         }
-        frameContext.drawImage(
-          tempCanvas,
-          0, 0, // start at top left of temp canvas
-          tempCanvas.width, tempCanvas.height,
-          targetX + bounds.offset.left, targetY + bounds.offset.top,
-          tempCanvas.width, tempCanvas.height,
-        );
-        frameContext.restore();
       }
       if (drawFrameBounds) {
         console.debug('drawing frame bounds', bounds, origin);
@@ -477,11 +487,16 @@ var App = (function () {
       targetCanvas.height = 2000;
       this._targetCanvas = targetCanvas;
 
-      const { maker, spritesheet } = await FrameMaker.fromBraveFrontierUnit(850438, 'gl');
+      const { maker, spritesheet } = await FrameMaker.fromBraveFrontierUnit(820158, 'gl');
       this._frameMaker = maker;
       this._spritesheets = [spritesheet];
 
-      this._currentAnimation = 'move';
+      this._vueData.activeAnimation = 'atk';
+      await new Promise((fulfill) => {
+        setTimeout(() => {
+          this.renderFrame(36).then(fulfill);
+        }, 5000);
+      });
     }
 
     get _formIsValid () {
@@ -569,6 +584,7 @@ var App = (function () {
       } else if (frameToRender >= animation.frames.length) {
         frameToRender -= animation.frames.length;
       }
+      // console.debug(index, frameToRender);
       // console.debug(frameToRender, this._frameIndex);
       const isValidIndex = frameToRender < animation.frames.length && frameToRender >= 0;
 
@@ -601,6 +617,10 @@ var App = (function () {
     
       this._vueData.frameIndex = (frameToRender + 1 < animation.frames.length && frameToRender >= 0) ? frameToRender + 1 : 0;
       return frame;
+    }
+
+    async saveAnimation (animationName) {
+      console.debug('would have saved animation', animationName);
     }
 
     async animate () {
