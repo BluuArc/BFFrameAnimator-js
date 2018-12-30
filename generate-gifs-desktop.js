@@ -11,6 +11,8 @@ const argv = require('yargs')
 
 const puppeteer = require('puppeteer');
 const fs = require('fs');
+const rp = require('request-promise');
+
 const unitInput = require('./advanced-units-input'); // read from advanced-units-input.js
 
 let browserInstance, pageInstance;
@@ -28,6 +30,10 @@ function base64BlobToGIF (base64Blob, filename = 'result.gif') {
       }
     });
   });
+}
+
+function serverIsActive () {
+  return rp('http://localhost:5000').then(() => true).catch(() => false);
 }
 
 async function getPageInstance () {
@@ -149,7 +155,7 @@ async function getAnimations (unitInfo) {
     }, type);
     
     const path = `${argv.gifpath}/${unitInfo.type || 'unit'}_${unitInfo.id}_${type}.gif`;
-    log('Saving GIF', path, result.url);
+    log('Saving GIF', path);
     return base64BlobToGIF(result.blob, path);
   });
 
@@ -193,6 +199,13 @@ async function start() {
     throw Error('No input specified');
   }
 
+  let server;
+  const isActive = await serverIsActive();
+  if (!isActive) {
+    console.log('Server not found. Starting server on port 5000.');
+    server = require('./web_deployment');
+  }
+
   console.time('Total Generation Time');
   const unitErrors = await createMultipleGifs(unitInput);
 
@@ -207,6 +220,11 @@ async function start() {
   }
   console.log('Done creating GIFs');
   console.timeEnd('Total Generation Time');
+
+  if (server) {
+    console.log('Closing server opened on port 5000');
+    server.close();
+  }
 }
 
 start();
