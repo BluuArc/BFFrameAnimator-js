@@ -541,6 +541,26 @@ var App = (function () {
         numFrames: 0,
         frameIndex: 0,
         animationUrls: {},
+        isAdvancedInput: false,
+        advancedSettings: {
+          numSpritesheets: 2,
+          spritesheets: {
+            0: 'http://dlc.bfglobal.gumi.sg/content/unit/img/unit_anime_10101905_L.png',
+            1: 'http://dlc.bfglobal.gumi.sg/content/unit/img/unit_anime_10101905_U.png',
+          },
+          cgg: 'http://dlc.bfglobal.gumi.sg/content/unit/cgg/unit_cgg_10101901.csv',
+          numAnimations: 3,
+          animations: {
+            0: 'http://dlc.bfglobal.gumi.sg/content/unit/cgs/unit_idle_cgs_10101901.csv',
+            1: 'http://dlc.bfglobal.gumi.sg/content/unit/cgs/unit_move_cgs_10101901.csv',
+            2: 'http://dlc.bfglobal.gumi.sg/content/unit/cgs/unit_atk_cgs_10101901.csv',
+          },
+          animationNames: {
+            0: 'idle',
+            1: 'move',
+            2: 'atk',
+          },
+        },
       };
       this._vueApp = new rn({
         el: '#app',
@@ -560,6 +580,23 @@ var App = (function () {
             if (newValue) {
               this.animate();
             }
+          },
+          advancedSettings: {
+            deep: true,
+            handler: (newValue, oldValue) => {
+              if (newValue.numSpritesheets < oldValue.numSpritesheets) {
+                for (let i = newValue.numSpritesheets; i < oldValue.numSpritesheets; ++i) {
+                  delete newValue.spritesheets[i];
+                }
+              }
+
+              if (newValue.numAnimations < oldValue.numAnimations) {
+                for (let i = newValue.numAnimations; i < oldValue.numAnimations; ++i) {
+                  delete newValue.animations[i];
+                  delete newValue.animationNames[i];
+                }
+              }
+            },
           },
         },
         methods: {
@@ -611,6 +648,29 @@ var App = (function () {
       if (isLoading !== undefined) {
         this._vueData.isLoading = !!isLoading;
       }
+    }
+
+    _generateAdvancedInput () {
+      const input = {
+        anime: [],
+        cgs: {},
+        cgg: this._vueData.advancedSettings.cgg,
+      };
+      for (let i = 0; i < this._vueData.advancedSettings.numSpritesheets; ++i) {
+        const sheet = this._vueData.advancedSettings.spritesheets[i];
+        if (sheet) {
+          input.anime.push(sheet);
+        }
+      }
+
+      for (let i = 0; i < this._vueData.advancedSettings.numAnimations; ++i) {
+        const url = this._vueData.advancedSettings.animations;
+        if (url) {
+          input.cgs[this._vueData.advancedSettings.animationNames[i] || `animation-${i}`] = url;
+        }
+      }
+
+      return input;
     }
 
     async generateAnimation () {

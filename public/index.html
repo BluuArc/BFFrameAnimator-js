@@ -41,6 +41,7 @@
 
         .container#inputOptions {
             flex-wrap: wrap;
+            width: 100%;
             margin: 0;
         }
 
@@ -82,24 +83,88 @@
                 <div class="card-content">
                     <span class="card-title">Options</span>
                     <section class="container" id="inputOptions">
-                        <section>
-                            <div style="flex: 1 0 auto;">
-                                <span>Unit ID</span>
-                                <input type="text" v-model="unitId" id="unitId" class="browser-default" placeholder="BF Unit ID">
-                            </div>
+                        <section class="container" style="margin: 0; min-width: 100%; margin-bottom: 1em;">
+                            <a
+                                :class="{ 'btn black-text': true, 'blue lighten-4': !isAdvancedInput, 'grey lighten-4': isAdvancedInput }"
+                                v-text="'Basic'"
+                                @click="isAdvancedInput = false"></a>
+                            <a
+                                :class="{ 'btn black-text': true, 'blue lighten-4': isAdvancedInput, 'grey lighten-4': !isAdvancedInput }"
+                                v-text="'Advanced'"
+                                @click="isAdvancedInput = true"></a>
                         </section>
-                        <section>
-                            <span>Server</span>
-                            <div style="display: flex; flex: 1 1 auto;">
-                                <label v-for="server in ['gl', 'eu', 'jp']" style="flex: 1 0 33%;">
-                                    <input name="server" type="radio" v-model="activeServer" :value="server">
-                                    <span v-text="server.toUpperCase()"></span>
-                                </label>
-                            </div>
-                        </section>
-                        <section>
+                        <template v-if="!isAdvancedInput">
+                            <section>
+                                <div style="flex: 1 0 auto;">
+                                    <span>Unit ID</span>
+                                    <input type="text" v-model="unitId" id="unitId" class="browser-default" placeholder="BF Unit ID">
+                                </div>
+                            </section>
+                            <section>
+                                <span>Server</span>
+                                <div style="display: flex; flex: 1 1 auto;">
+                                    <label v-for="server in ['gl', 'eu', 'jp']" style="flex: 1 0 33%;">
+                                        <input name="server" type="radio" v-model="activeServer" :value="server">
+                                        <span v-text="server.toUpperCase()"></span>
+                                    </label>
+                                </div>
+                            </section>
+                        </template>
+                        <template v-else>
+                            <section style="flex-wrap: wrap; align-self: flex-start; margin-bottom: 1em;">
+                                <div style="flex: 1 0 100%; display: flex; justify-content: space-between;">
+                                    <div style="flex: 1 0 auto;">Spritesheets</div>
+                                    <div style="flex: 1 0 auto; display: flex; justify-content: flex-end;">
+                                        <a 
+                                            style="flex: 0 0 auto;"
+                                            :class="{ 'btn black-text': true, disabled: advancedSettings.numSpritesheets < 2 }" @click="advancedSettings.numSpritesheets = Math.max(advancedSettings.numSpritesheets - 1, 1)">
+                                            <i class="fas fa-minus-square"></i>
+                                        </a>
+                                        <a 
+                                            style="flex: 0 0 auto;"
+                                            class="btn black-text" @click="advancedSettings.numSpritesheets += 1">
+                                            <i class="fas fa-plus-square"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                                <section class="container" style="margin: 0; width: 100%; flex-wrap: wrap;">
+                                    <div v-for="(n, i) in advancedSettings.numSpritesheets" :key="i" style="flex: 0 0 95%; display: flex;">
+                                        <span style="flex: none;">Sheet {{ i }}</span>
+                                        <input style="flex: 1 0 auto;" type="text" v-model="advancedSettings.spritesheets[i]" class="browser-default" :placeholder="`Spritesheet ${i}`">
+                                    </div>
+                                </section>
+                            </section>
+                            <section style="flex-wrap: wrap; align-self: flex-start; max-width: 100%; margin-bottom: 1em;">
+                                <div style="flex: 1 0 100%; display: flex; justify-content: space-between;">
+                                    <div style="flex: 1 0 auto;">Animations</div>
+                                    <div style="flex: 1 0 auto; display: flex; justify-content: flex-end;">
+                                        <a 
+                                            style="flex: 0 0 auto;"
+                                            :class="{ 'btn black-text': true, disabled: advancedSettings.numAnimations < 2 }" @click="advancedSettings.numAnimations = Math.max(advancedSettings.numAnimations - 1, 1)">
+                                            <i class="fas fa-minus-square"></i>
+                                        </a>
+                                        <a 
+                                            style="flex: 0 0 auto;"
+                                            class="btn black-text" @click="advancedSettings.numAnimations += 1">
+                                            <i class="fas fa-plus-square"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                                <section class="container" style="margin: 0; width: 100%; flex-wrap: wrap;">
+                                    <div v-for="(n, i) in advancedSettings.numAnimations" :key="i" style="flex: 0 0 95%; display: flex; max-width: 100%;">
+                                        <input style="flex: 0 1 75px; min-width: 50px;" type="text" v-model="advancedSettings.animationNames[i]" class="browser-default" :placeholder="`Animation Name ${i}`">
+                                        <input style="flex: 1 1 auto;" type="text" v-model="advancedSettings.animations[i]" class="browser-default" :placeholder="`CGS CSV URL ${i}`">
+                                    </div>
+                                </section>
+                            </section>
+                            <section style="flex: 1 0 auto; max-width: 100%;">
+                                <span style="flex: none;">CGG CSV URL</span>
+                                <input style="flex: 1 0 auto;" type="text" v-model="advancedSettings.cgg"  class="browser-default" placeholder="CGG CSV URL">
+                            </section>
+                        </template>
+                        <section style="min-width: 100%;">
                             <div style="flex: 1 0 100%; margin-top: 2em;">
-                                <label style="display: flex; align-items: center;">
+                                <label style="display: flex; align-items: center; flex-wrap: wrap;">
                                     <input style="flex: none;" type="checkbox" v-model="doTrim" id="doTrim">
                                     <span style="flex: 1 1 auto; height: auto;">Trim Whitespace (may clip out too much on some animations)</span>
                                 </label>
