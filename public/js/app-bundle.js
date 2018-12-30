@@ -54,6 +54,18 @@ var App = (function () {
       this._animations = {};
     }
 
+    _blobToBase64 (blob) {
+      return new Promise((fulfill) => {
+        const reader = new FileReader();
+        reader.onload = function () {
+          const dataUrl = reader.result;
+          const base64 = dataUrl.split(',')[1];
+          fulfill(base64);
+        };
+        reader.readAsDataURL(blob);
+      });
+    }
+
     static get SAMPLE_ADVANCED_INPUT () {
       return {
         id: '10101905',
@@ -511,12 +523,17 @@ var App = (function () {
           gif.render();
         });
 
-        animationEntry.gif = URL.createObjectURL(blob);
+        animationEntry.gif = {
+          url: URL.createObjectURL(blob),
+          blob: await this._blobToBase64(blob),
+        };
       }
 
       return animationEntry.gif;
     }
   }
+
+  window.FrameMaker = FrameMaker; // for desktop script
 
   class App {
     constructor () {
@@ -800,7 +817,7 @@ var App = (function () {
 
       this._setLog(`Creating GIF for ${animationName} [0.00%]`, true);
       try {
-        this._vueData.animationUrls[animationName] = await this._frameMaker.toGif({
+        const result = await this._frameMaker.toGif({
           spritesheets: this._spritesheets,
           animationName,
           GifClass: GIF,
@@ -808,6 +825,7 @@ var App = (function () {
             this._setLog(`Creating GIF [${(amt * 100).toFixed(2)}%]`);
           },
         });
+        this._vueData.animationUrls[animationName] = result.url;
       } catch (err) {
         // eslint-disable-next-line no-console
         console.error(err);

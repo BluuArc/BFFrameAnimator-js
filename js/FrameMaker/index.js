@@ -45,6 +45,18 @@ export default class FrameMaker {
     this._animations = {};
   }
 
+  _blobToBase64 (blob) {
+    return new Promise((fulfill) => {
+      const reader = new FileReader();
+      reader.onload = function () {
+        const dataUrl = reader.result;
+        const base64 = dataUrl.split(',')[1];
+        fulfill(base64);
+      };
+      reader.readAsDataURL(blob);
+    });
+  }
+
   static get SAMPLE_ADVANCED_INPUT () {
     return {
       id: '10101905',
@@ -502,7 +514,10 @@ export default class FrameMaker {
         gif.render();
       });
 
-      animationEntry.gif = URL.createObjectURL(blob);
+      animationEntry.gif = {
+        url: URL.createObjectURL(blob),
+        blob: await this._blobToBase64(blob),
+      };
     }
 
     return animationEntry.gif;

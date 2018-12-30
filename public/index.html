@@ -224,7 +224,7 @@
                 </div>
                 <div
                     v-if="activeAnimation"
-                    :class="{ 'card-action': true, 'green lighten-4': !isLoading && animationUrls[activeAnimation] }">
+                    :class="{ 'card-action': true, 'green lighten-4': !isLoading && animationUrls[activeAnimation], 'grey lighten-3': isLoading }">
                     <a v-if="!animationUrls[activeAnimation]" @click="generateGif(activeAnimation)" href="#" :class="{ 'blue-text text-darken-2': !isLoading, 'grey-text text-darken-2': isLoading }">
                         Generate {{ activeAnimation }} Animation
                     </a>

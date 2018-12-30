@@ -49,6 +49,8 @@ app.get('/getImage/:url',function (req, res){
   });
 });
 
-app.listen(app.get('port'), function () {
+const server = app.listen(app.get('port'), function () {
   console.log('Listening on ' + this.address().address + ':' + this.address().port);
 });
+
+module.exports = server;

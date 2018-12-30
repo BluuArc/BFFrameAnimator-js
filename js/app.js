@@ -5,6 +5,8 @@
 import Vue from 'vue';
 import FrameMaker from './FrameMaker';
 
+window.FrameMaker = FrameMaker; // for desktop script
+
 export default class App {
   constructor () {
     this._frameMaker = null;
@@ -287,7 +289,7 @@ export default class App {
 
     this._setLog(`Creating GIF for ${animationName} [0.00%]`, true);
     try {
-      this._vueData.animationUrls[animationName] = await this._frameMaker.toGif({
+      const result = await this._frameMaker.toGif({
         spritesheets: this._spritesheets,
         animationName,
         GifClass: GIF,
@@ -295,6 +297,7 @@ export default class App {
           this._setLog(`Creating GIF [${(amt * 100).toFixed(2)}%]`);
         },
       });
+      this._vueData.animationUrls[animationName] = result.url;
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error(err);
