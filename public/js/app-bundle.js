@@ -638,7 +638,14 @@ var App = (function () {
     }
 
     get _formIsValid () {
-      return this._vueData.unitId.length > 0 && !isNaN(this._vueData.unitId) && ['gl', 'eu', 'jp'].includes(this._vueData.activeServer);
+      if (this._vueData.isAdvancedInput) {
+        const input = this._generateAdvancedInput();
+        console.debug(input);
+        return input.anime.length > 0 && input.cgg && Object.keys(input.cgs).length > 0;
+      } else {
+        console.debug(this._vueData);
+        return this._vueData.unitId.length > 0 && !isNaN(this._vueData.unitId) && ['gl', 'eu', 'jp'].includes(this._vueData.activeServer);
+      }
     }
 
     _setLog (message = '', isLoading) {
@@ -664,7 +671,7 @@ var App = (function () {
       }
 
       for (let i = 0; i < this._vueData.advancedSettings.numAnimations; ++i) {
-        const url = this._vueData.advancedSettings.animations;
+        const url = this._vueData.advancedSettings.animations[i];
         if (url) {
           input.cgs[this._vueData.advancedSettings.animationNames[i] || `animation-${i}`] = url;
         }
@@ -677,7 +684,6 @@ var App = (function () {
       if (this._vueData.isLoading) {
         return;
       }
-      console.debug(this._vueData);
       if (!this._formIsValid) {
         this._vueData.errorOccurred = true;
         this._vueData.formMessage = '<b>ERROR:</b> Form input isn\'t valid. Please try again.';
@@ -693,17 +699,20 @@ var App = (function () {
       await this._vueApp.$nextTick();
       // load animation data
       try {
-        const { maker, spritesheet } = await FrameMaker.fromBraveFrontierUnit(this._vueData.unitId, this._vueData.activeServer, this._vueData.doTrim);
-        this._frameMaker = maker;
-        this._spritesheets = [spritesheet];
-        // const { maker, spritesheets } = await FrameMaker.fromAdvancedInput(undefined, this._vueData.doTrim);
-        // this._frameMaker = maker;
-        // this._spritesheets = spritesheets.slice();
+        if (this._vueData.isAdvancedInput) {
+          const { maker, spritesheets } = await FrameMaker.fromAdvancedInput(this._generateAdvancedInput(), this._vueData.doTrim);
+          this._frameMaker = maker;
+          this._spritesheets = spritesheets.slice();
+        } else {
+          const { maker, spritesheet } = await FrameMaker.fromBraveFrontierUnit(this._vueData.unitId, this._vueData.activeServer, this._vueData.doTrim);
+          this._frameMaker = maker;
+          this._spritesheets = [spritesheet];
+        }
       } catch (err) {
         // eslint-disable-next-line no-console
         console.error(err);
         this._vueData.errorOccurred = true;
-        this._setLog(`Error getting animation data for ${this._vueData.unitId}`, false);
+        this._setLog(`Error getting animation data for ${!this._vueData.isAdvancedInput ? this._vueData.unitId : 'advanced input'}`, false);
         return;
       }
 
