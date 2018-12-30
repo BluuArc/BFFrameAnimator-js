@@ -66,16 +66,25 @@ export default class App {
     targetCanvas.height = 2000;
     this._targetCanvas = targetCanvas;
 
-    const { maker, spritesheet } = await FrameMaker.fromBraveFrontierUnit(820158, 'gl');
+    // const { maker, spritesheet } = await FrameMaker.fromBraveFrontierUnit(820158, 'gl');
+    // this._frameMaker = maker;
+    // this._spritesheets = [spritesheet];
+    const { maker, spritesheets } = await FrameMaker.fromAdvancedInput(undefined, this._vueData.doTrim);
     this._frameMaker = maker;
-    this._spritesheets = [spritesheet];
+    this._spritesheets = spritesheets.slice();
 
-    this._vueData.activeAnimation = 'atk';
-    await new Promise((fulfill) => {
-      setTimeout(() => {
-        this.renderFrame(36).then(fulfill);
-      }, 5000);
+    spritesheets.forEach((sheet) => {
+      const img = document.createElement('img');
+      img.src = sheet.src;
+      document.body.appendChild(img);
     });
+
+    this._vueData.activeAnimation = 'idle';
+    // await new Promise((fulfill) => {
+    //   setTimeout(() => {
+    //     this.renderFrame().then(fulfill);
+    //   }, 5000);
+    // });
   }
 
   get _formIsValid () {
@@ -114,6 +123,9 @@ export default class App {
       const { maker, spritesheet } = await FrameMaker.fromBraveFrontierUnit(this._vueData.unitId, this._vueData.activeServer, this._vueData.doTrim);
       this._frameMaker = maker;
       this._spritesheets = [spritesheet];
+      // const { maker, spritesheets } = await FrameMaker.fromAdvancedInput(undefined, this._vueData.doTrim);
+      // this._frameMaker = maker;
+      // this._spritesheets = spritesheets.slice();
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error(err);

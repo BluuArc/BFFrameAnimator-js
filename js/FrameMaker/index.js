@@ -45,6 +45,32 @@ export default class FrameMaker {
     this._animations = {};
   }
 
+  static get SAMPLE_ADVANCED_INPUT () {
+    return {
+      id: '10101905',
+      anime: [
+        'http://dlc.bfglobal.gumi.sg/content/unit/img/unit_anime_10101905_L.png',
+        'http://dlc.bfglobal.gumi.sg/content/unit/img/unit_anime_10101905_U.png',
+      ],
+      cgg: 'http://dlc.bfglobal.gumi.sg/content/unit/cgg/unit_cgg_10101901.csv',
+      cgs: {
+        idle: 'http://dlc.bfglobal.gumi.sg/content/unit/cgs/unit_idle_cgs_10101901.csv',
+        move: 'http://dlc.bfglobal.gumi.sg/content/unit/cgs/unit_move_cgs_10101901.csv',
+        atk: 'http://dlc.bfglobal.gumi.sg/content/unit/cgs/unit_atk_cgs_10101901.csv',
+      },
+    };
+  }
+
+  static _loadCsv (path) {
+    return fetch(path)
+      .then(r => {
+        if (r.status !== 200) {
+          throw new Error(`Fetch error: ${r.status} - ${r.statusText}`);
+        }
+        return r.text();
+      }).then(r => r.split('\n').map(line => line.split(',')));
+  }
+
   // very specific (but main use case) for the frame maker: animate Brave Frontier units
   static async fromBraveFrontierUnit (id = '10011', server = 'gl', doTrim = false) {
     const serverUrls = {
@@ -58,31 +84,46 @@ export default class FrameMaker {
       anime: 'unit/img/'
     };
     const animationTypes = ['idle', 'atk', 'move', server === 'eu' && 'skill'].filter(v => v);
-    const loadCsv = (path) => fetch(path)
-      .then(r => {
-        if (r.status !== 200) {
-          throw new Error(`Fetch error: ${r.status} - ${r.statusText}`);
-        }
-        return r.text();
-      }).then(r => r.split('\n').map(line => line.split(',')));
-
     const baseUrl = serverUrls[server];
     if (!baseUrl) {
       throw new Error(`Unknown server [${server}]`);
     }
 
-    // start querying for data simultaneously
-    const imagePromise = new Promise((fulfill, reject) => {
-      const spritesheet = new Image();
-      spritesheet.onload = () => fulfill(spritesheet);
-      spritesheet.onerror = spritesheet.onabort = reject;
-      spritesheet.src = `/getImage/${encodeURIComponent(baseUrl + filepaths.anime + `unit_anime_${id}.png`)}`;
+    const input = {
+      anime: [
+        [baseUrl, filepaths.anime, `unit_anime_${id}.png`].join(''),
+      ],
+      cgg: [baseUrl, filepaths.cgg, `unit_cgg_${id}.csv`].join(''),
+      cgs: {},
+    };
+
+    animationTypes.forEach(type => {
+      input.cgs[type] = [baseUrl, filepaths.cgs, `unit_${type}_cgs_${id}.csv`].join('');
     });
 
+    const { spritesheets, maker } = await FrameMaker.fromAdvancedInput(input, doTrim);
+
+    return {
+      maker,
+      spritesheet: spritesheets[0],
+    };
+  }
+
+  static async fromAdvancedInput (input = FrameMaker.SAMPLE_ADVANCED_INPUT, doTrim = false) {
+    const spritesheets = input.anime
+      .map(sheet => new Promise((fulfill, reject) => {
+        const spritesheet = new Image();
+        spritesheet.onload = () => fulfill(spritesheet);
+        spritesheet.onerror = spritesheet.onabort = reject;
+        spritesheet.src = `/getImage/${encodeURIComponent(sheet)}`;
+      }));
+
     const cgsCsv = {};
-    const cgsPromises = animationTypes.map(type => {
-      return loadCsv(`/get/${encodeURIComponent(baseUrl + filepaths.cgs + `unit_${type}_cgs_${id}.csv`)}`)
-        .then(csv => { cgsCsv[type] = csv; })
+    const cgsPromises = Object.keys(input.cgs).map(type => {
+      return FrameMaker._loadCsv(`/get/${encodeURIComponent(input.cgs[type])}`)
+        .then(csv => {
+          cgsCsv[type] = csv;
+        })
         .catch(err => {
           // eslint-disable-next-line no-console
           console.warn(`Skipping CGS [${type}] due to error`, err);
@@ -90,7 +131,7 @@ export default class FrameMaker {
         });
     });
 
-    const maker = await loadCsv(`/get/${encodeURIComponent(baseUrl + filepaths.cgg + `unit_cgg_${id}.csv`)}`)
+    const maker = await FrameMaker._loadCsv(`/get/${encodeURIComponent(input.cgg)}`)
       .then(csv => new FrameMaker(csv));
 
     // add found cgs animations to maker
@@ -100,9 +141,9 @@ export default class FrameMaker {
     }
 
     // return the spritesheet and FrameMaker instance
-    return imagePromise.then(spritesheet => ({
+    return Promise.all(spritesheets).then(spritesheets => ({
       maker,
-      spritesheet,
+      spritesheets,
     }));
   }
 
@@ -279,7 +320,6 @@ export default class FrameMaker {
       const part = cggFrame.parts[partIndex];
       await this._waitForIdleFrame(); // only generate frames between idle periods
       try {
-
         const sourceWidth = part.img.width, sourceHeight = part.img.height;
         tempContext.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
         tempContext.globalAlpha = part.opacity / 100;
@@ -327,26 +367,24 @@ export default class FrameMaker {
         }
 
         // put part canvas on document body for debugging
-        // if (animationIndex === 12) {
-        //   const bodyCanvas = document.createElement('canvas');
-        //   bodyCanvas.width = tempCanvas.width;
-        //   bodyCanvas.height = tempCanvas.height;
-        //   bodyCanvas.dataset.cgsIndex = cggFrame.parts.length - 1;
-        //   const bodyContext = bodyCanvas.getContext('2d');
-        //   bodyContext.globalAlpha = part.opacity / 100;
-        //   bodyContext.drawImage(tempCanvas, 0, 0);
-        //   bodyContext.beginPath();
-        //   bodyContext.rect(tempCanvas.width / 2 - sourceWidth / 2, tempCanvas.height / 2 - sourceHeight / 2, sourceWidth, sourceHeight);
-        //   bodyContext.stroke();
-        //   bodyContext.fillStyle = 'red';
-        //   bodyContext.beginPath();
-        //   bodyContext.ellipse(
-        //     tempCanvas.width / 2, tempCanvas.height / 2,
-        //     5, 5, Math.PI / 2, 0, 2 * Math.PI
-        //   );
-        //   bodyContext.fill();
-        //   document.body.appendChild(bodyCanvas);
-        // }
+        // const bodyCanvas = document.createElement('canvas');
+        // bodyCanvas.width = tempCanvas.width;
+        // bodyCanvas.height = tempCanvas.height;
+        // bodyCanvas.dataset.cgsIndex = cggFrame.parts.length - 1;
+        // const bodyContext = bodyCanvas.getContext('2d');
+        // bodyContext.globalAlpha = part.opacity / 100;
+        // bodyContext.drawImage(tempCanvas, 0, 0);
+        // bodyContext.beginPath();
+        // bodyContext.rect(tempCanvas.width / 2 - sourceWidth / 2, tempCanvas.height / 2 - sourceHeight / 2, sourceWidth, sourceHeight);
+        // bodyContext.stroke();
+        // bodyContext.fillStyle = 'red';
+        // bodyContext.beginPath();
+        // bodyContext.ellipse(
+        //   tempCanvas.width / 2, tempCanvas.height / 2,
+        //   5, 5, Math.PI / 2, 0, 2 * Math.PI
+        // );
+        // bodyContext.fill();
+        // document.body.appendChild(bodyCanvas);
 
         // copy part result to frame canvas
         // await this._waitForIdleFrame(); // only generate frames between idle periods
