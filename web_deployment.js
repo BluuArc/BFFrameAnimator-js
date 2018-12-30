@@ -62,8 +62,11 @@ app.get('/getImage/:url',function(req,res){
 });
 
 app.get('/', function (req,res) {
-    console.log("Sending index.html");
     res.sendFile("index.html").end();
+});
+
+app.get('/v1', function (req, res) {
+    res.sendFile("v1.html").end();
 });
 
 // app.get('/framemaker', function (req, res) {

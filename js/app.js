@@ -1,5 +1,7 @@
 'use strict';
 
+/* global GIF */
+
 import Vue from 'vue';
 import FrameMaker from './FrameMaker';
 
@@ -25,6 +27,7 @@ export default class App {
       isPlaying: false,
       numFrames: 0,
       frameIndex: 0,
+      animationUrls: {},
     };
     this._vueApp = new Vue({
       el: '#app',
@@ -49,6 +52,7 @@ export default class App {
       methods: {
         generateAnimation: () => this.generateAnimation(),
         renderFrame: (...args) => this.renderFrame(...args),
+        generateGif: (...args) => this.generateGif(...args),
         animate: () => this.animate(),
       },
     });
@@ -145,8 +149,10 @@ export default class App {
       return;
     }
 
+    
     // notify that animations are finished
     this._vueData.animationReady = true;
+    this._vueData.animationUrls = {};
     this._vueData.activeAnimation = animationNames[0];
     this._setLog(`Successfully generated animation for ${this._vueData.unitId}`, false);
   }
@@ -194,8 +200,29 @@ export default class App {
     return frame;
   }
 
-  async saveAnimation (animationName) {
-    console.debug('would have saved animation', animationName);
+  async generateGif (animationName) {
+    this._vueData.isPlaying = false;
+    this._vueData.errorOccurred = false;
+
+    this._setLog(`Creating GIF for ${animationName} [0.00%]`, true);
+    try {
+      this._vueData.animationUrls[animationName] = await this._frameMaker.toGif({
+        spritesheets: this._spritesheets,
+        animationName,
+        GifClass: GIF,
+        onProgressUpdate: (amt) => {
+          this._setLog(`Creating GIF [${(amt * 100).toFixed(2)}%]`);
+        },
+      });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(err);
+      this._vueData.errorOccurred = true;
+      this._setLog(`Error generating GIF for ${animationName}`, false);
+      return;
+    }
+
+    this._setLog(`Successfully generated GIF for ${animationName}`, false);
   }
 
   async animate () {

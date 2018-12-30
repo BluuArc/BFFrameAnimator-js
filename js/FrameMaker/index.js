@@ -190,6 +190,7 @@ export default class FrameMaker {
       bounds,
       trimmed: trim,
       cachedCanvases: {},
+      gif: null,
     };
   }
 
@@ -416,5 +417,56 @@ export default class FrameMaker {
       drawFrameBounds,
     });
     targetCanvas.getContext('2d').drawImage(frameCanvas, 0, 0);
+  }
+
+  async toGif ({
+    spritesheets = [], // array of img elements containing sprite sheets
+    animationName = 'name',
+    referenceCanvas, // referenced for dimensions on first draw, otherwise optional
+    forceRedraw = false,
+    drawFrameBounds = false,
+    GifClass,
+    useTransparency = true,
+    onProgressUpdate,
+  }) {
+    const gif = new GifClass({
+      workerScript: 'js/gif.worker.js',
+      copy: true,
+      quality: 1,
+      transparent: useTransparency ? 'rgba(0,0,0,0)' : undefined
+    });
+
+    const animationEntry = this._animations[animationName];
+    if (!animationEntry) {
+      throw new Error(`No animation entry found with name ${animationName}`);
+    } 
+    
+    if (!animationEntry.gif) {
+      const numFrames = animationEntry.frames.length;
+      for (let i = 0; i < numFrames; ++i) {
+        const frame = await this.getFrame({
+          spritesheets,
+          animationName,
+          animationIndex: i,
+          referenceCanvas,
+          forceRedraw,
+          drawFrameBounds,
+        });
+        const delay = Math.floor(frame.dataset.delay / 60 * 1000);
+        gif.addFrame(frame, { delay });
+  
+      }
+      const blob = await new Promise((fulfill) => {
+        if (typeof onProgressUpdate === 'function') {
+          gif.on('progress', amt => onProgressUpdate(amt));
+        }
+        gif.on('finished', blob => fulfill(blob));
+        gif.render();
+      });
+
+      animationEntry.gif = URL.createObjectURL(blob);
+    }
+
+    return animationEntry.gif;
   }
 }

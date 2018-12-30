@@ -199,6 +199,7 @@ var App = (function () {
         bounds,
         trimmed: trim,
         cachedCanvases: {},
+        gif: null,
       };
     }
 
@@ -426,6 +427,57 @@ var App = (function () {
       });
       targetCanvas.getContext('2d').drawImage(frameCanvas, 0, 0);
     }
+
+    async toGif ({
+      spritesheets = [], // array of img elements containing sprite sheets
+      animationName = 'name',
+      referenceCanvas, // referenced for dimensions on first draw, otherwise optional
+      forceRedraw = false,
+      drawFrameBounds = false,
+      GifClass,
+      useTransparency = true,
+      onProgressUpdate,
+    }) {
+      const gif = new GifClass({
+        workerScript: 'js/gif.worker.js',
+        copy: true,
+        quality: 1,
+        transparent: useTransparency ? 'rgba(0,0,0,0)' : undefined
+      });
+
+      const animationEntry = this._animations[animationName];
+      if (!animationEntry) {
+        throw new Error(`No animation entry found with name ${animationName}`);
+      } 
+      
+      if (!animationEntry.gif) {
+        const numFrames = animationEntry.frames.length;
+        for (let i = 0; i < numFrames; ++i) {
+          const frame = await this.getFrame({
+            spritesheets,
+            animationName,
+            animationIndex: i,
+            referenceCanvas,
+            forceRedraw,
+            drawFrameBounds,
+          });
+          const delay = Math.floor(frame.dataset.delay / 60 * 1000);
+          gif.addFrame(frame, { delay });
+    
+        }
+        const blob = await new Promise((fulfill) => {
+          if (typeof onProgressUpdate === 'function') {
+            gif.on('progress', amt => onProgressUpdate(amt));
+          }
+          gif.on('finished', blob => fulfill(blob));
+          gif.render();
+        });
+
+        animationEntry.gif = URL.createObjectURL(blob);
+      }
+
+      return animationEntry.gif;
+    }
   }
 
   class App {
@@ -450,6 +502,7 @@ var App = (function () {
         isPlaying: false,
         numFrames: 0,
         frameIndex: 0,
+        animationUrls: {},
       };
       this._vueApp = new rn({
         el: '#app',
@@ -474,6 +527,7 @@ var App = (function () {
         methods: {
           generateAnimation: () => this.generateAnimation(),
           renderFrame: (...args) => this.renderFrame(...args),
+          generateGif: (...args) => this.generateGif(...args),
           animate: () => this.animate(),
         },
       });
@@ -570,8 +624,10 @@ var App = (function () {
         return;
       }
 
+      
       // notify that animations are finished
       this._vueData.animationReady = true;
+      this._vueData.animationUrls = {};
       this._vueData.activeAnimation = animationNames[0];
       this._setLog(`Successfully generated animation for ${this._vueData.unitId}`, false);
     }
@@ -619,8 +675,29 @@ var App = (function () {
       return frame;
     }
 
-    async saveAnimation (animationName) {
-      console.debug('would have saved animation', animationName);
+    async generateGif (animationName) {
+      this._vueData.isPlaying = false;
+      this._vueData.errorOccurred = false;
+
+      this._setLog(`Creating GIF for ${animationName} [0.00%]`, true);
+      try {
+        this._vueData.animationUrls[animationName] = await this._frameMaker.toGif({
+          spritesheets: this._spritesheets,
+          animationName,
+          GifClass: GIF,
+          onProgressUpdate: (amt) => {
+            this._setLog(`Creating GIF [${(amt * 100).toFixed(2)}%]`);
+          },
+        });
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error(err);
+        this._vueData.errorOccurred = true;
+        this._setLog(`Error generating GIF for ${animationName}`, false);
+        return;
+      }
+
+      this._setLog(`Successfully generated GIF for ${animationName}`, false);
     }
 
     async animate () {
