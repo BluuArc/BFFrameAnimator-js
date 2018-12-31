@@ -304,7 +304,7 @@ export default class FrameMaker {
     const cggFrame = this._frames[cgsFrame.frameIndex];
     // console.debug(`drawing frame [cgs:${animationIndex}, cgg:${cgsFrame.frameIndex}]`, cggFrame);
 
-    const tempCanvasSize = (spritesheets.reduce((acc, val) => Math.max(acc, val.width, val.height), Math.max(bounds.w + Math.abs(bounds.offset.left) * 2, bounds.h + Math.abs(bounds.offset.top) * 2))) * 2;
+    const tempCanvasSize = (spritesheets.reduce((acc, val) => Math.max(acc, val.width, val.height), Math.max(bounds.w + Math.abs(bounds.offset.left) * 2, bounds.h + Math.abs(bounds.offset.top) * 2)));
     // used as a temp canvas for rotating/flipping parts
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = tempCanvasSize;
@@ -340,10 +340,10 @@ export default class FrameMaker {
         const flipY = part.flipType === 2 || part.flipType === 3;
 
         // draw part onto center of part canvas
-        tempContext.save(); 
         let tempX = tempCanvas.width / 2 - sourceWidth / 2,
           tempY = tempCanvas.height / 2 - sourceHeight / 2;
         if (flipX || flipY) {
+          tempContext.save();
           tempContext.translate(flipX ? sourceWidth : 0, flipY ? sourceHeight : 0);
           tempContext.scale(flipX ? -1 : 1, flipY ? -1 : 1);
           tempX -= (flipX ? tempCanvas.width - sourceWidth : 0);
@@ -356,7 +356,9 @@ export default class FrameMaker {
           tempX, tempY,
           sourceWidth, sourceHeight,
         );
-        tempContext.restore();
+        if (flipX || flipY) {
+          tempContext.restore();
+        }
 
         // blend code based off of this: http://pastebin.com/vXc0yNRh
         if (part.blendMode === 1) {
@@ -364,14 +366,13 @@ export default class FrameMaker {
           const imgData = tempContext.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
           const pixelData = imgData.data;
           for (let p = 0; p < pixelData.length; p += 4) {
-            let [r, g, b, a] = [pixelData[p], pixelData[p + 1], pixelData[p + 2], pixelData[p + 3]];
-            if (a > 0) {
+            if (pixelData[p + 3] > 0) { // if alpha > 0
+              let [r, g, b, a] = [pixelData[p], pixelData[p + 1], pixelData[p + 2], pixelData[p + 3]];
               const multiplier = 1 + (a * part.opacity / 100) / 255.0;
               r = Math.min(255, Math.floor(r * multiplier));
               g = Math.min(255, Math.floor(g * multiplier));
               b = Math.min(255, Math.floor(b * multiplier));
               a = Math.floor(((r + g + b) / 3) * part.opacity / 100);
-
               [pixelData[p], pixelData[p + 1], pixelData[p + 2], pixelData[p + 3]] = [r, g, b, a];
             }
           }
@@ -400,10 +401,10 @@ export default class FrameMaker {
 
         // copy part result to frame canvas
         // await this._waitForIdleFrame(); // only generate frames between idle periods
-        frameContext.save();
         const targetX = origin.x + part.position.x + sourceWidth / 2 - tempCanvasSize / 2,
           targetY = origin.y + part.position.y + sourceHeight / 2 - tempCanvasSize / 2;
         if (part.rotate !== 0) {
+          frameContext.save();
           // console.debug('rotating', part.rotate);
           frameContext.translate(origin.x + part.position.x + sourceWidth / 2 + bounds.offset.left, origin.y + part.position.y + sourceHeight / 2 + bounds.offset.top);
           frameContext.rotate(-part.rotate * Math.PI / 180);
@@ -416,7 +417,9 @@ export default class FrameMaker {
           targetX + bounds.offset.left, targetY + bounds.offset.top,
           tempCanvas.width, tempCanvas.height,
         );
-        frameContext.restore();
+        if (part.rotate !== 0) {
+          frameContext.restore();
+        }
       } catch (err) {
         /* eslint-disable no-console */
         console.warn('skipping part due to error', partIndex, part);

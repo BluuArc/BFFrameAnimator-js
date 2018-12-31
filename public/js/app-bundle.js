@@ -274,7 +274,7 @@ var App = (function () {
       }
       const cgsFrame = animationEntry.frames[animationIndex];
       const cggFrame = this._frames[cgsFrame.frameIndex];
-      const tempCanvasSize = (spritesheets.reduce((acc, val) => Math.max(acc, val.width, val.height), Math.max(bounds.w + Math.abs(bounds.offset.left) * 2, bounds.h + Math.abs(bounds.offset.top) * 2))) * 2;
+      const tempCanvasSize = (spritesheets.reduce((acc, val) => Math.max(acc, val.width, val.height), Math.max(bounds.w + Math.abs(bounds.offset.left) * 2, bounds.h + Math.abs(bounds.offset.top) * 2)));
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = tempCanvasSize;
       tempCanvas.height = tempCanvasSize;
@@ -302,10 +302,10 @@ var App = (function () {
           tempContext.globalAlpha = part.opacity / 100;
           const flipX = part.flipType === 1 || part.flipType === 3;
           const flipY = part.flipType === 2 || part.flipType === 3;
-          tempContext.save();
           let tempX = tempCanvas.width / 2 - sourceWidth / 2,
             tempY = tempCanvas.height / 2 - sourceHeight / 2;
           if (flipX || flipY) {
+            tempContext.save();
             tempContext.translate(flipX ? sourceWidth : 0, flipY ? sourceHeight : 0);
             tempContext.scale(flipX ? -1 : 1, flipY ? -1 : 1);
             tempX -= (flipX ? tempCanvas.width - sourceWidth : 0);
@@ -317,13 +317,15 @@ var App = (function () {
             tempX, tempY,
             sourceWidth, sourceHeight,
           );
-          tempContext.restore();
+          if (flipX || flipY) {
+            tempContext.restore();
+          }
           if (part.blendMode === 1) {
             const imgData = tempContext.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
             const pixelData = imgData.data;
             for (let p = 0; p < pixelData.length; p += 4) {
-              let [r, g, b, a] = [pixelData[p], pixelData[p + 1], pixelData[p + 2], pixelData[p + 3]];
-              if (a > 0) {
+              if (pixelData[p + 3] > 0) {
+                let [r, g, b, a] = [pixelData[p], pixelData[p + 1], pixelData[p + 2], pixelData[p + 3]];
                 const multiplier = 1 + (a * part.opacity / 100) / 255.0;
                 r = Math.min(255, Math.floor(r * multiplier));
                 g = Math.min(255, Math.floor(g * multiplier));
@@ -334,10 +336,10 @@ var App = (function () {
             }
             tempContext.putImageData(imgData, 0, 0);
           }
-          frameContext.save();
           const targetX = origin.x + part.position.x + sourceWidth / 2 - tempCanvasSize / 2,
             targetY = origin.y + part.position.y + sourceHeight / 2 - tempCanvasSize / 2;
           if (part.rotate !== 0) {
+            frameContext.save();
             frameContext.translate(origin.x + part.position.x + sourceWidth / 2 + bounds.offset.left, origin.y + part.position.y + sourceHeight / 2 + bounds.offset.top);
             frameContext.rotate(-part.rotate * Math.PI / 180);
             frameContext.translate(-(origin.x + part.position.x + sourceWidth / 2 + bounds.offset.left), -(origin.y + part.position.y + sourceHeight / 2 + bounds.offset.top));
@@ -349,7 +351,9 @@ var App = (function () {
             targetX + bounds.offset.left, targetY + bounds.offset.top,
             tempCanvas.width, tempCanvas.height,
           );
-          frameContext.restore();
+          if (part.rotate !== 0) {
+            frameContext.restore();
+          }
         } catch (err) {
           console.warn('skipping part due to error', partIndex, part);
           console.error(err);

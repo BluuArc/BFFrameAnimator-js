@@ -29,7 +29,12 @@ module.exports = [
     // OE Vargas in a simplified format
     // NOTE: simplified format only supported by BF1 units
     'id': '10017',
-    'server': 'gl',
+    'server': 'gl', // server parameter is required for units using the simplified format
     'doTrim': true
   },
+  {
+    // OE Raquiel
+    'id': '820158',
+    'server': 'gl'
+  }
 ];
