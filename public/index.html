@@ -172,17 +172,38 @@
                         </section>
                     </section>
                 </div>
+                <div style="margin-bottom: 0;" class="progress" v-if="isLoading || majorProgress === 100">
+                    <div v-if="majorProgress >= 0" class="determinate" :style="`width: ${majorProgress}%`"></div>
+                    <div v-else class="indeterminate"></div>
+                </div>
                 <div
                     :class="{ 'card-action container': true, 'grey lighten-3': isLoading, 'green lighten-4': !isLoading && animationReady, 'red lighten-4': !isLoading && errorOccurred }"
                     style="margin: 0; justify-content: space-between; width: 100%;">
                     <a
                         @click="generateAnimation"
-                        href="#"
+                        href="#progress"
                         :class="{ 'blue-text text-darken-2': !isLoading, 'grey-text text-darken-2': isLoading }"
                         style="flex: none;">
                         Generate
                     </a>
-                    <span style="text-align: right;" v-if="formMessage" v-html="formMessage"></span>
+                    <span style="text-align: right; display: flex; align-items: center; justify-content: flex-end;" v-if="formMessage">
+                        <div v-if="isLoading" class="preloader-wrapper active" style="flex: none; width: 1.5em; height: 1.5em;">
+                            <div class="spinner-layer spinner-green-only">
+                            <div class="circle-clipper left">
+                                <div class="circle"></div>
+                            </div><div class="gap-patch">
+                                <div class="circle"></div>
+                            </div><div class="circle-clipper right">
+                                <div class="circle"></div>
+                            </div>
+                            </div>
+                        </div>
+                        <span v-text="formMessage" style="flex: 0 1 auto;" id="progress"></span>
+                    </span>
+                </div>
+                <div style="margin-top: 0;" class="progress" v-if="isLoading || minorProgress === 100">
+                    <div v-if="minorProgress >= 0" class="determinate" :style="`width: ${minorProgress}%`"></div>
+                    <div v-else class="indeterminate"></div>
                 </div>
             </div>
         </div>
@@ -225,7 +246,7 @@
                 <div
                     v-if="activeAnimation"
                     :class="{ 'card-action': true, 'green lighten-4': !isLoading && animationUrls[activeAnimation], 'grey lighten-3': isLoading }">
-                    <a v-if="!animationUrls[activeAnimation]" @click="generateGif(activeAnimation)" href="#" :class="{ 'blue-text text-darken-2': !isLoading, 'grey-text text-darken-2': isLoading }">
+                    <a v-if="!animationUrls[activeAnimation]" @click="generateGif(activeAnimation)" href="#progress" :class="{ 'blue-text text-darken-2': !isLoading, 'grey-text text-darken-2': isLoading }">
                         Generate {{ activeAnimation }} Animation
                     </a>
                     <a v-else :href="animationUrls[activeAnimation]" class="blue-text text-darken-2" target="_blank">

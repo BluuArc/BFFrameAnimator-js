@@ -1,5 +1,6 @@
 'use strict';
 import greenlet from 'greenlet';
+import waitForIdleFrame from '../waitForIdleFrame';
 
 const calculateAnimationBounds = greenlet(function (cgsEntry = [], frames = [], doTrim = false) {
   let xMin = Infinity, yMin = Infinity, xMax = -Infinity, yMax = -Infinity;
@@ -271,15 +272,6 @@ export default class FrameMaker {
     return animation ? animation.frames.length : 0;
   }
 
-  _waitForIdleFrame () {
-    return new Promise(fulfill => {
-      if ('requestIdleCallback' in window) {
-        window.requestIdleCallback(fulfill);
-      } else {
-        setTimeout(fulfill, 1);
-      }
-    });
-  }
 
   async getFrame({
     spritesheets = [], // array of img elements containing sprite sheets
@@ -330,7 +322,7 @@ export default class FrameMaker {
     // render each part in reverse order onto the frameCanvas
     for (let partIndex = cggFrame.parts.length - 1; partIndex >= 0; --partIndex) {
       const part = cggFrame.parts[partIndex];
-      await this._waitForIdleFrame(); // only generate frames between idle periods
+      await waitForIdleFrame(); // only copy parts between idle periods to lessen UI lag
       try {
         const sourceWidth = part.img.width, sourceHeight = part.img.height;
         tempContext.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
@@ -362,7 +354,6 @@ export default class FrameMaker {
 
         // blend code based off of this: http://pastebin.com/vXc0yNRh
         if (part.blendMode === 1) {
-          // await this._waitForIdleFrame(); // only generate frames between idle periods
           const imgData = tempContext.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
           const pixelData = imgData.data;
           for (let p = 0; p < pixelData.length; p += 4) {
@@ -400,7 +391,6 @@ export default class FrameMaker {
         // document.body.appendChild(bodyCanvas);
 
         // copy part result to frame canvas
-        // await this._waitForIdleFrame(); // only generate frames between idle periods
         const targetX = origin.x + part.position.x + sourceWidth / 2 - tempCanvasSize / 2,
           targetY = origin.y + part.position.y + sourceHeight / 2 - tempCanvasSize / 2;
         if (part.rotate !== 0) {

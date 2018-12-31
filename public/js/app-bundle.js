@@ -10,6 +10,16 @@ var App = (function () {
 
   function greenlet(n){var e=0,t={},a=new Worker("data:,$$="+n+";onmessage="+function(n){Promise.resolve(n.data[1]).then(function(n){return $$.apply($$,n)}).then(function(e){postMessage([n.data[0],0,e],[e].filter(function(n){return n instanceof ArrayBuffer||n instanceof MessagePort||n instanceof ImageBitmap}));},function(e){postMessage([n.data[0],1,""+e]);});});return a.onmessage=function(n){t[n.data[0]][n.data[1]](n.data[2]),t[n.data[0]]=null;},function(n){return n=[].slice.call(arguments),new Promise(function(){t[++e]=arguments,a.postMessage([e,n],n.filter(function(n){return n instanceof ArrayBuffer||n instanceof MessagePort||n instanceof ImageBitmap}));})}}
 
+  function waitForIdleFrame () {
+    return new Promise(fulfill => {
+      if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(fulfill);
+      } else {
+        setTimeout(fulfill, 1);
+      }
+    });
+  }
+
   const calculateAnimationBounds = greenlet(function (cgsEntry = [], frames = [], doTrim = false) {
     let xMin = Infinity, yMin = Infinity, xMax = -Infinity, yMax = -Infinity;
     cgsEntry.forEach(cgsFrame => {
@@ -247,15 +257,6 @@ var App = (function () {
       const animation = this._animations[name];
       return animation ? animation.frames.length : 0;
     }
-    _waitForIdleFrame () {
-      return new Promise(fulfill => {
-        if ('requestIdleCallback' in window) {
-          window.requestIdleCallback(fulfill);
-        } else {
-          setTimeout(fulfill, 1);
-        }
-      });
-    }
     async getFrame({
       spritesheets = [],
       animationName = 'name',
@@ -295,7 +296,7 @@ var App = (function () {
       const frameContext = frameCanvas.getContext('2d');
       for (let partIndex = cggFrame.parts.length - 1; partIndex >= 0; --partIndex) {
         const part = cggFrame.parts[partIndex];
-        await this._waitForIdleFrame();
+        await waitForIdleFrame();
         try {
           const sourceWidth = part.img.width, sourceHeight = part.img.height;
           tempContext.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
@@ -494,6 +495,8 @@ var App = (function () {
             2: 'atk',
           },
         },
+        majorProgress: Infinity,
+        minorProgress: Infinity,
       };
       this._vueApp = new rn({
         el: '#app',
@@ -572,6 +575,14 @@ var App = (function () {
         this._vueData.isLoading = !!isLoading;
       }
     }
+    _setProgress (major, minor) {
+      if (!isNaN(major)) {
+        this._vueData.majorProgress = +major;
+      }
+      if (!isNaN(minor)) {
+        this._vueData.minorProgress = +minor;
+      }
+    }
     _generateAdvancedInput () {
       const input = {
         anime: [],
@@ -607,7 +618,8 @@ var App = (function () {
       this._vueData.activeAnimation = '';
       this._vueData.frameIndex = 0;
       this._setLog('Loading spritesheets and CSVs...', true);
-      await this._vueApp.$nextTick();
+      this._setProgress(-1, Infinity);
+      await waitForIdleFrame();
       try {
         if (this._vueData.isAdvancedInput) {
           const { maker, spritesheets } = await FrameMaker.fromAdvancedInput(this._generateAdvancedInput(), this._vueData.doTrim);
@@ -629,9 +641,11 @@ var App = (function () {
       this._vueApp.animationNames = animationNames;
       try {
         for (const name of animationNames) {
+          this._setProgress(animationNames.indexOf(name) + 1);
           const animation = this._frameMaker.getAnimation(name);
           const numFrames = animation.frames.length;
           for (let i = 0; i < numFrames; ++i) {
+            this._setProgress(undefined, Math.floor(i / numFrames * 100));
             this._setLog(`Generating frames for ${name} [${(i+1).toString().padStart(numFrames.toString().length, '0')}/${numFrames}]...`);
             await this._frameMaker.getFrame({
               spritesheets: this._spritesheets,
@@ -644,13 +658,14 @@ var App = (function () {
       } catch (err) {
         console.error(err);
         this._vueData.errorOccurred = true;
-        this._setLog(`Error getting animation data for ${this._vueData.unitId}`, false);
+        this._setLog(`Error getting animation data for ${!this._vueData.isAdvancedInput ? this._vueData.unitId : 'advanced input'}`, false);
         return;
       }
       this._vueData.animationReady = true;
       this._vueData.animationUrls = {};
       this._vueData.activeAnimation = animationNames[0];
-      this._setLog(`Successfully generated animation for ${this._vueData.unitId}`, false);
+      this._setProgress(100, 100);
+      this._setLog(`Successfully generated animation for ${!this._vueData.isAdvancedInput ? this._vueData.unitId : 'advanced input'}`, false);
     }
     async renderFrame (index, options = {}) {
       const animation = this._frameMaker.getAnimation(this._currentAnimation);
@@ -685,6 +700,8 @@ var App = (function () {
       this._vueData.isPlaying = false;
       this._vueData.errorOccurred = false;
       this._setLog(`Creating GIF for ${animationName} [0.00%]`, true);
+      this._setProgress(Infinity, 0);
+      await waitForIdleFrame();
       try {
         const result = await this._frameMaker.toGif({
           spritesheets: this._spritesheets,
@@ -692,6 +709,7 @@ var App = (function () {
           GifClass: GIF,
           onProgressUpdate: (amt) => {
             this._setLog(`Creating GIF [${(amt * 100).toFixed(2)}%]`);
+            this._setProgress(undefined, Math.floor(amt * 100));
           },
         });
         this._vueData.animationUrls[animationName] = result.url;
@@ -701,6 +719,7 @@ var App = (function () {
         this._setLog(`Error generating GIF for ${animationName}`, false);
         return;
       }
+      this._setProgress(undefined, 100);
       this._setLog(`Successfully generated GIF for ${animationName}`, false);
     }
     async animate () {

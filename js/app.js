@@ -4,6 +4,7 @@
 
 import Vue from 'vue';
 import FrameMaker from './FrameMaker';
+import waitForIdleFrame from './waitForIdleFrame';
 
 window.FrameMaker = FrameMaker; // for desktop script
 
@@ -50,6 +51,8 @@ export default class App {
           2: 'atk',
         },
       },
+      majorProgress: Infinity, // > 100 = hidden, < 0 = indeterminate, 0 - 100 = progress
+      minorProgress: Infinity,
     };
     this._vueApp = new Vue({
       el: '#app',
@@ -146,6 +149,15 @@ export default class App {
     }
   }
 
+  _setProgress (major, minor) {
+    if (!isNaN(major)) {
+      this._vueData.majorProgress = +major;
+    }
+    if (!isNaN(minor)) {
+      this._vueData.minorProgress = +minor;
+    }
+  }
+
   _generateAdvancedInput () {
     const input = {
       anime: [],
@@ -185,7 +197,8 @@ export default class App {
     this._vueData.activeAnimation = '';
     this._vueData.frameIndex = 0;
     this._setLog('Loading spritesheets and CSVs...', true);
-    await this._vueApp.$nextTick();
+    this._setProgress(-1, Infinity);
+    await waitForIdleFrame();
     // load animation data
     try {
       if (this._vueData.isAdvancedInput) {
@@ -211,9 +224,11 @@ export default class App {
     this._vueApp.animationNames = animationNames;
     try {
       for (const name of animationNames) {
+        this._setProgress(animationNames.indexOf(name) + 1);
         const animation = this._frameMaker.getAnimation(name);
         const numFrames = animation.frames.length;
         for (let i = 0; i < numFrames; ++i) {
+          this._setProgress(undefined, Math.floor(i / numFrames * 100));
           this._setLog(`Generating frames for ${name} [${(i+1).toString().padStart(numFrames.toString().length, '0')}/${numFrames}]...`);
           // await this._waitForIdleFrame();
           await this._frameMaker.getFrame({
@@ -228,7 +243,7 @@ export default class App {
       // eslint-disable-next-line no-console
       console.error(err);
       this._vueData.errorOccurred = true;
-      this._setLog(`Error getting animation data for ${this._vueData.unitId}`, false);
+      this._setLog(`Error getting animation data for ${!this._vueData.isAdvancedInput ? this._vueData.unitId : 'advanced input'}`, false);
       return;
     }
 
@@ -237,7 +252,8 @@ export default class App {
     this._vueData.animationReady = true;
     this._vueData.animationUrls = {};
     this._vueData.activeAnimation = animationNames[0];
-    this._setLog(`Successfully generated animation for ${this._vueData.unitId}`, false);
+    this._setProgress(100, 100);
+    this._setLog(`Successfully generated animation for ${!this._vueData.isAdvancedInput ? this._vueData.unitId : 'advanced input'}`, false);
   }
 
   async renderFrame (index, options = {}) {
@@ -288,6 +304,8 @@ export default class App {
     this._vueData.errorOccurred = false;
 
     this._setLog(`Creating GIF for ${animationName} [0.00%]`, true);
+    this._setProgress(Infinity, 0);
+    await waitForIdleFrame();
     try {
       const result = await this._frameMaker.toGif({
         spritesheets: this._spritesheets,
@@ -295,6 +313,7 @@ export default class App {
         GifClass: GIF,
         onProgressUpdate: (amt) => {
           this._setLog(`Creating GIF [${(amt * 100).toFixed(2)}%]`);
+          this._setProgress(undefined, Math.floor(amt * 100));
         },
       });
       this._vueData.animationUrls[animationName] = result.url;
@@ -306,6 +325,7 @@ export default class App {
       return;
     }
 
+    this._setProgress(undefined, 100);
     this._setLog(`Successfully generated GIF for ${animationName}`, false);
   }
 
