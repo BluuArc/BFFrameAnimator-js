@@ -17,11 +17,9 @@ var App = (function () {
       const xOffset = Math.abs(cgsFrame.xOffset) || 0;
       const yOffset = Math.abs(cgsFrame.yOffset) || 0;
       frameData.parts.forEach(part => {
-        // bounds are x +- width and y +- height
         const w = part.img.width, h = part.img.height;
         xMin = Math.min(xMin, part.position.x - (doTrim ? 0 : w) - xOffset);
         yMin = Math.min(yMin, part.position.y - (doTrim ? 0 : h) - yOffset);
-
         xMax = Math.max(xMax, part.position.x + w + xOffset);
         yMax = Math.max(yMax, part.position.y + h + yOffset);
       });
@@ -30,8 +28,8 @@ var App = (function () {
       width = xMax - xMin,
       height = yMax - yMin;
     if (!doTrim) {
-      left = -(xMax + xMin) / 4; // center horizontally
-      top = -(yMax + yMin) / 4; // center vertically
+      left = -(xMax + xMin) / 4;
+      top = -(yMax + yMin) / 4;
     } else {
       left = -(xMax + xMin) / 2;
       top = -(yMax + yMin) / 2;
@@ -41,19 +39,17 @@ var App = (function () {
       y: [yMin, yMax],
       w: width,
       h: height,
-      offset: { // equivalent to padding
+      offset: {
         left,
         top,
       },
     };
   });
-
   class FrameMaker {
     constructor (cggCsv = []) {
       this._frames = this._processCgg(cggCsv);
       this._animations = {};
     }
-
     _blobToBase64 (blob) {
       return new Promise((fulfill) => {
         const reader = new FileReader();
@@ -65,7 +61,6 @@ var App = (function () {
         reader.readAsDataURL(blob);
       });
     }
-
     static get SAMPLE_ADVANCED_INPUT () {
       return {
         id: '10101905',
@@ -81,7 +76,6 @@ var App = (function () {
         },
       };
     }
-
     static _loadCsv (path) {
       return fetch(path)
         .then(r => {
@@ -91,8 +85,6 @@ var App = (function () {
           return r.text();
         }).then(r => r.split('\n').map(line => line.split(',')));
     }
-
-    // very specific (but main use case) for the frame maker: animate Brave Frontier units
     static async fromBraveFrontierUnit (id = '10011', server = 'gl', doTrim = false) {
       const serverUrls = {
         eu: 'http://static-bravefrontier.gumi-europe.net/content/',
@@ -109,7 +101,6 @@ var App = (function () {
       if (!baseUrl) {
         throw new Error(`Unknown server [${server}]`);
       }
-
       const input = {
         anime: [
           [baseUrl, filepaths.anime, `unit_anime_${id}.png`].join(''),
@@ -117,19 +108,15 @@ var App = (function () {
         cgg: [baseUrl, filepaths.cgg, `unit_cgg_${id}.csv`].join(''),
         cgs: {},
       };
-
       animationTypes.forEach(type => {
         input.cgs[type] = [baseUrl, filepaths.cgs, `unit_${type}_cgs_${id}.csv`].join('');
       });
-
       const { spritesheets, maker } = await FrameMaker.fromAdvancedInput(input, doTrim);
-
       return {
         maker,
         spritesheet: spritesheets[0],
       };
     }
-
     static async fromAdvancedInput (input = FrameMaker.SAMPLE_ADVANCED_INPUT, doTrim = false) {
       const spritesheets = input.anime
         .map(sheet => new Promise((fulfill, reject) => {
@@ -138,7 +125,6 @@ var App = (function () {
           spritesheet.onerror = spritesheet.onabort = reject;
           spritesheet.src = `/getImage/${encodeURIComponent(sheet)}`;
         }));
-
       const cgsCsv = {};
       const cgsPromises = Object.keys(input.cgs).map(type => {
         return FrameMaker._loadCsv(`/get/${encodeURIComponent(input.cgs[type])}`)
@@ -146,35 +132,27 @@ var App = (function () {
             cgsCsv[type] = csv;
           })
           .catch(err => {
-            // eslint-disable-next-line no-console
             console.warn(`Skipping CGS [${type}] due to error`, err);
             return;
           });
       });
-
       const maker = await FrameMaker._loadCsv(`/get/${encodeURIComponent(input.cgg)}`)
         .then(csv => new FrameMaker(csv));
-
-      // add found cgs animations to maker
       await Promise.all(cgsPromises);
       for (const key in cgsCsv) {
         await maker.addAnimation(key, cgsCsv[key], doTrim);
       }
-
-      // return the spritesheet and FrameMaker instance
       return Promise.all(spritesheets).then(spritesheets => ({
         maker,
         spritesheets,
       }));
     }
-
     _cggLineToEntry (frameLine = [], index = -1) {
       const entry = {
         anchorType: +frameLine[0],
         partCount: +frameLine[1],
         parts: [],
       };
-
       let curIndex = 2, partCount = 0;
       const partIsValid = (part = {}) => {
         for (const field in part) {
@@ -184,11 +162,9 @@ var App = (function () {
         }
         return true;
       };
-
-      // parse each part in the line
       while (partCount < entry.partCount) {
         const part = {
-          position: { // origin is middle
+          position: {
             x: +frameLine[curIndex++],
             y: +frameLine[curIndex++],
           },
@@ -196,7 +172,7 @@ var App = (function () {
           blendMode: +frameLine[curIndex++],
           opacity: +frameLine[curIndex++],
           rotate: +frameLine[curIndex++],
-          img: { // origin is top left
+          img: {
             x: +frameLine[curIndex++],
             y: +frameLine[curIndex++],
             width: +frameLine[curIndex++],
@@ -213,16 +189,14 @@ var App = (function () {
       }
       return entry;
     }
-
     _processCgg (cggCsv = []) {
       return cggCsv
-        .filter(frame => frame.length >= 2) // filter out empty frames
+        .filter(frame => frame.length >= 2)
         .map((frame, i) => this._cggLineToEntry(frame, i));
     }
-
     _processCgs (cgsCsv = []) {
       return cgsCsv.map(frame => ({
-        frameIndex: +frame[0], // same index in cgg
+        frameIndex: +frame[0],
         xOffset: +frame[1],
         yOffset: +frame[2],
         frameDelay: +frame[3],
@@ -232,9 +206,8 @@ var App = (function () {
           console.warn('Ignoring NaN CGS line', frame, i, fullArr);
         }
         return isValid;
-      }); // filter out unparseable frames
+      });
     }
-
     async addAnimation (key = 'name', csv = [], doTrim) {
       const cgsFrames = this._processCgs(csv);
       const lowercaseKey = key.toLowerCase();
@@ -246,7 +219,6 @@ var App = (function () {
         this._frames,
         trim,
       );
-
       this._animations[key] = {
         frames: cgsFrames,
         bounds,
@@ -255,15 +227,12 @@ var App = (function () {
         gif: null,
       };
     }
-
     getAnimation (key = 'name') {
       return this._animations[key];
     }
-
     get loadedAnimations () {
       const preferredOrder = ['idle', 'move', 'atk', 'skill'];
       return Object.keys(this._animations).sort((a, b) => {
-        // order so that preferred order comes first and unknown comes last
         const [aIndex, bIndex] = [preferredOrder.indexOf(a), preferredOrder.indexOf(b)];
         if (aIndex === bIndex) {
           return a < b ? -1 : 1;
@@ -274,12 +243,10 @@ var App = (function () {
         }
       });
     }
-
     getNumberOfFramesForAnimation (name = 'name') {
       const animation = this._animations[name];
       return animation ? animation.frames.length : 0;
     }
-
     _waitForIdleFrame () {
       return new Promise(fulfill => {
         if ('requestIdleCallback' in window) {
@@ -289,12 +256,11 @@ var App = (function () {
         }
       });
     }
-
     async getFrame({
-      spritesheets = [], // array of img elements containing sprite sheets
+      spritesheets = [],
       animationName = 'name',
       animationIndex = -1,
-      referenceCanvas, // referenced for dimensions on first draw, otherwise optional
+      referenceCanvas,
       forceRedraw = false,
       drawFrameBounds = false,
     }) {
@@ -302,24 +268,16 @@ var App = (function () {
       if (!animationEntry) {
         throw new Error(`No animation entry found with name ${animationName}`);
       }
-
       const { bounds, cachedCanvases } = animationEntry;
       if (cachedCanvases[animationIndex] && !forceRedraw) {
-        // console.debug(`using cached frame [cgs:${animationIndex}]`);
         return cachedCanvases[animationIndex];
       }
-
       const cgsFrame = animationEntry.frames[animationIndex];
       const cggFrame = this._frames[cgsFrame.frameIndex];
-      console.debug(`drawing frame [cgs:${animationIndex}, cgg:${cgsFrame.frameIndex}]`, cggFrame);
-
       const tempCanvasSize = (spritesheets.reduce((acc, val) => Math.max(acc, val.width, val.height), Math.max(bounds.w + Math.abs(bounds.offset.left) * 2, bounds.h + Math.abs(bounds.offset.top) * 2))) * 2;
-      // used as a temp canvas for rotating/flipping parts
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = tempCanvasSize;
       tempCanvas.height = tempCanvasSize;
-
-      // final frame rendered here, to be cached
       const frameCanvas = document.createElement('canvas');
       if (referenceCanvas) {
         frameCanvas.width = referenceCanvas.width;
@@ -329,27 +287,22 @@ var App = (function () {
         frameCanvas.height = bounds.h;
       }
       frameCanvas.dataset.delay = cgsFrame.frameDelay;
-
       const origin = {
         x: frameCanvas.width / 2,
         y: frameCanvas.height / 2,
       };
       const tempContext = tempCanvas.getContext('2d');
       const frameContext = frameCanvas.getContext('2d');
-      // render each part in reverse order onto the frameCanvas
       for (let partIndex = cggFrame.parts.length - 1; partIndex >= 0; --partIndex) {
         const part = cggFrame.parts[partIndex];
-        await this._waitForIdleFrame(); // only generate frames between idle periods
+        await this._waitForIdleFrame();
         try {
           const sourceWidth = part.img.width, sourceHeight = part.img.height;
           tempContext.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
           tempContext.globalAlpha = part.opacity / 100;
-
           const flipX = part.flipType === 1 || part.flipType === 3;
           const flipY = part.flipType === 2 || part.flipType === 3;
-
-          // draw part onto center of part canvas
-          tempContext.save(); 
+          tempContext.save();
           let tempX = tempCanvas.width / 2 - sourceWidth / 2,
             tempY = tempCanvas.height / 2 - sourceHeight / 2;
           if (flipX || flipY) {
@@ -358,7 +311,6 @@ var App = (function () {
             tempX -= (flipX ? tempCanvas.width - sourceWidth : 0);
             tempY -= (flipY ? tempCanvas.height - sourceHeight : 0);
           }
-          // from spritesheet to part canvas
           tempContext.drawImage(
             spritesheets[part.pageId],
             part.img.x, part.img.y, sourceWidth, sourceHeight,
@@ -366,10 +318,7 @@ var App = (function () {
             sourceWidth, sourceHeight,
           );
           tempContext.restore();
-
-          // blend code based off of this: http://pastebin.com/vXc0yNRh
           if (part.blendMode === 1) {
-            // await this._waitForIdleFrame(); // only generate frames between idle periods
             const imgData = tempContext.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
             const pixelData = imgData.data;
             for (let p = 0; p < pixelData.length; p += 4) {
@@ -380,57 +329,30 @@ var App = (function () {
                 g = Math.min(255, Math.floor(g * multiplier));
                 b = Math.min(255, Math.floor(b * multiplier));
                 a = Math.floor(((r + g + b) / 3) * part.opacity / 100);
-
                 [pixelData[p], pixelData[p + 1], pixelData[p + 2], pixelData[p + 3]] = [r, g, b, a];
               }
             }
             tempContext.putImageData(imgData, 0, 0);
           }
-
-          // put part canvas on document body for debugging
-          // const bodyCanvas = document.createElement('canvas');
-          // bodyCanvas.width = tempCanvas.width;
-          // bodyCanvas.height = tempCanvas.height;
-          // bodyCanvas.dataset.cgsIndex = cggFrame.parts.length - 1;
-          // const bodyContext = bodyCanvas.getContext('2d');
-          // bodyContext.globalAlpha = part.opacity / 100;
-          // bodyContext.drawImage(tempCanvas, 0, 0);
-          // bodyContext.beginPath();
-          // bodyContext.rect(tempCanvas.width / 2 - sourceWidth / 2, tempCanvas.height / 2 - sourceHeight / 2, sourceWidth, sourceHeight);
-          // bodyContext.stroke();
-          // bodyContext.fillStyle = 'red';
-          // bodyContext.beginPath();
-          // bodyContext.ellipse(
-          //   tempCanvas.width / 2, tempCanvas.height / 2,
-          //   5, 5, Math.PI / 2, 0, 2 * Math.PI
-          // );
-          // bodyContext.fill();
-          // document.body.appendChild(bodyCanvas);
-
-          // copy part result to frame canvas
-          // await this._waitForIdleFrame(); // only generate frames between idle periods
           frameContext.save();
           const targetX = origin.x + part.position.x + sourceWidth / 2 - tempCanvasSize / 2,
             targetY = origin.y + part.position.y + sourceHeight / 2 - tempCanvasSize / 2;
           if (part.rotate !== 0) {
-            // console.debug('rotating', part.rotate);
             frameContext.translate(origin.x + part.position.x + sourceWidth / 2 + bounds.offset.left, origin.y + part.position.y + sourceHeight / 2 + bounds.offset.top);
             frameContext.rotate(-part.rotate * Math.PI / 180);
             frameContext.translate(-(origin.x + part.position.x + sourceWidth / 2 + bounds.offset.left), -(origin.y + part.position.y + sourceHeight / 2 + bounds.offset.top));
           }
           frameContext.drawImage(
             tempCanvas,
-            0, 0, // start at top left of temp canvas
+            0, 0,
             tempCanvas.width, tempCanvas.height,
             targetX + bounds.offset.left, targetY + bounds.offset.top,
             tempCanvas.width, tempCanvas.height,
           );
           frameContext.restore();
         } catch (err) {
-          /* eslint-disable no-console */
           console.warn('skipping part due to error', partIndex, part);
           console.error(err);
-          /* eslint-enable no-console */
         }
       }
       if (drawFrameBounds) {
@@ -456,12 +378,10 @@ var App = (function () {
       }
       cachedCanvases[animationIndex] = frameCanvas;
       tempCanvas.remove();
-      // console.debug(bounds, frameCanvas);
       return frameCanvas;
     }
-
     async drawFrame ({
-      spritesheets = [], // array of img elements containing sprite sheets
+      spritesheets = [],
       animationName = 'name', animationIndex = -1,
       targetCanvas = document.createElement('canvas'),
       forceRedraw = false,
@@ -477,11 +397,10 @@ var App = (function () {
       });
       targetCanvas.getContext('2d').drawImage(frameCanvas, 0, 0);
     }
-
     async toGif ({
-      spritesheets = [], // array of img elements containing sprite sheets
+      spritesheets = [],
       animationName = 'name',
-      referenceCanvas, // referenced for dimensions on first draw, otherwise optional
+      referenceCanvas,
       forceRedraw = false,
       drawFrameBounds = false,
       GifClass,
@@ -494,12 +413,10 @@ var App = (function () {
         quality: 1,
         transparent: useTransparency ? 'rgba(0,0,0,0)' : undefined
       });
-
       const animationEntry = this._animations[animationName];
       if (!animationEntry) {
         throw new Error(`No animation entry found with name ${animationName}`);
-      } 
-      
+      }
       if (!animationEntry.gif) {
         const numFrames = animationEntry.frames.length;
         for (let i = 0; i < numFrames; ++i) {
@@ -513,7 +430,6 @@ var App = (function () {
           });
           const delay = Math.floor(frame.dataset.delay / 60 * 1000);
           gif.addFrame(frame, { delay });
-    
         }
         const blob = await new Promise((fulfill) => {
           if (typeof onProgressUpdate === 'function') {
@@ -522,19 +438,16 @@ var App = (function () {
           gif.on('finished', blob => fulfill(blob));
           gif.render();
         });
-
         animationEntry.gif = {
           url: URL.createObjectURL(blob),
           blob: await this._blobToBase64(blob),
         };
       }
-
       return animationEntry.gif;
     }
   }
 
-  window.FrameMaker = FrameMaker; // for desktop script
-
+  window.FrameMaker = FrameMaker;
   class App {
     constructor () {
       this._frameMaker = null;
@@ -543,7 +456,6 @@ var App = (function () {
       this._currentAnimation = null;
       this._raf = null;
       this._framesUntilRedraw = 0;
-
       this._vueData = {
         isLoading: false,
         animationReady: false,
@@ -606,7 +518,6 @@ var App = (function () {
                   delete newValue.spritesheets[i];
                 }
               }
-
               if (newValue.numAnimations < oldValue.numAnimations) {
                 for (let i = newValue.numAnimations; i < oldValue.numAnimations; ++i) {
                   delete newValue.animations[i];
@@ -623,37 +534,23 @@ var App = (function () {
           animate: () => this.animate(),
         },
       });
-
       this._targetCanvas = document.querySelector('canvas#target');
     }
-
     async init () {
       const targetCanvas = document.querySelector('canvas#target');
       targetCanvas.width = 2000;
       targetCanvas.height = 2000;
       this._targetCanvas = targetCanvas;
-
-      // const { maker, spritesheet } = await FrameMaker.fromBraveFrontierUnit(820158, 'gl');
-      // this._frameMaker = maker;
-      // this._spritesheets = [spritesheet];
       const { maker, spritesheets } = await FrameMaker.fromAdvancedInput(undefined, this._vueData.doTrim);
       this._frameMaker = maker;
       this._spritesheets = spritesheets.slice();
-
       spritesheets.forEach((sheet) => {
         const img = document.createElement('img');
         img.src = sheet.src;
         document.body.appendChild(img);
       });
-
       this._vueData.activeAnimation = 'idle';
-      // await new Promise((fulfill) => {
-      //   setTimeout(() => {
-      //     this.renderFrame().then(fulfill);
-      //   }, 5000);
-      // });
     }
-
     get _formIsValid () {
       if (this._vueData.isAdvancedInput) {
         const input = this._generateAdvancedInput();
@@ -664,16 +561,13 @@ var App = (function () {
         return this._vueData.unitId.length > 0 && !isNaN(this._vueData.unitId) && ['gl', 'eu', 'jp'].includes(this._vueData.activeServer);
       }
     }
-
     _setLog (message = '', isLoading) {
-      // eslint-disable-next-line no-console
       console.debug('[LOG]', message);
       this._vueData.formMessage = message;
       if (isLoading !== undefined) {
         this._vueData.isLoading = !!isLoading;
       }
     }
-
     _generateAdvancedInput () {
       const input = {
         anime: [],
@@ -686,17 +580,14 @@ var App = (function () {
           input.anime.push(sheet);
         }
       }
-
       for (let i = 0; i < this._vueData.advancedSettings.numAnimations; ++i) {
         const url = this._vueData.advancedSettings.animations[i];
         if (url) {
           input.cgs[this._vueData.advancedSettings.animationNames[i] || `animation-${i}`] = url;
         }
       }
-
       return input;
     }
-
     async generateAnimation () {
       if (this._vueData.isLoading) {
         return;
@@ -706,7 +597,6 @@ var App = (function () {
         this._vueData.formMessage = '<b>ERROR:</b> Form input isn\'t valid. Please try again.';
         return;
       }
-
       this._vueData.animationReady = false;
       this._vueData.isPlaying = false;
       this._vueData.errorOccurred = false;
@@ -714,7 +604,6 @@ var App = (function () {
       this._vueData.frameIndex = 0;
       this._setLog('Loading spritesheets and CSVs...', true);
       await this._vueApp.$nextTick();
-      // load animation data
       try {
         if (this._vueData.isAdvancedInput) {
           const { maker, spritesheets } = await FrameMaker.fromAdvancedInput(this._generateAdvancedInput(), this._vueData.doTrim);
@@ -726,14 +615,11 @@ var App = (function () {
           this._spritesheets = [spritesheet];
         }
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.error(err);
         this._vueData.errorOccurred = true;
         this._setLog(`Error getting animation data for ${!this._vueData.isAdvancedInput ? this._vueData.unitId : 'advanced input'}`, false);
         return;
       }
-
-      // generate the animations
       const animationNames = this._frameMaker.loadedAnimations;
       console.debug(animationNames);
       this._vueApp.animationNames = animationNames;
@@ -743,31 +629,25 @@ var App = (function () {
           const numFrames = animation.frames.length;
           for (let i = 0; i < numFrames; ++i) {
             this._setLog(`Generating frames for ${name} [${(i+1).toString().padStart(numFrames.toString().length, '0')}/${numFrames}]...`);
-            // await this._waitForIdleFrame();
             await this._frameMaker.getFrame({
               spritesheets: this._spritesheets,
               animationName: name,
               animationIndex: i,
-              drawFrameBounds: false, // set true for debugging
+              drawFrameBounds: false,
             });
           }
         }
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.error(err);
         this._vueData.errorOccurred = true;
         this._setLog(`Error getting animation data for ${this._vueData.unitId}`, false);
         return;
       }
-
-      
-      // notify that animations are finished
       this._vueData.animationReady = true;
       this._vueData.animationUrls = {};
       this._vueData.activeAnimation = animationNames[0];
       this._setLog(`Successfully generated animation for ${this._vueData.unitId}`, false);
     }
-
     async renderFrame (index, options = {}) {
       const animation = this._frameMaker.getAnimation(this._currentAnimation);
       let frameToRender = !isNaN(index) ? +index : this._vueData.frameIndex;
@@ -776,17 +656,13 @@ var App = (function () {
       } else if (frameToRender >= animation.frames.length) {
         frameToRender -= animation.frames.length;
       }
-      // console.debug(index, frameToRender);
-      // console.debug(frameToRender, this._frameIndex);
       const isValidIndex = frameToRender < animation.frames.length && frameToRender >= 0;
-
       const frame = await this._frameMaker.getFrame({
         spritesheets: this._spritesheets,
         animationName: this._currentAnimation,
         animationIndex: isValidIndex ? frameToRender : 0,
         ...options,
       });
-      // console.debug(index, animation, frame);
       if (this._targetCanvas.width !== frame.width) {
         this._targetCanvas.width = frame.width;
         this._targetCanvas.style.width = `${frame.width}px`;
@@ -798,23 +674,12 @@ var App = (function () {
       const context = this._targetCanvas.getContext('2d');
       context.clearRect(0, 0, this._targetCanvas.width, this._targetCanvas.height);
       context.drawImage(frame, 0, 0);
-
-      // mark center of canvas
-      // context.save();
-      // context.fillStyle = 'red';
-      // context.beginPath();
-      // context.ellipse(this._targetCanvas.width / 2, this._targetCanvas.height / 2, 3, 3, Math.PI / 2, 0, Math.PI * 2);
-      // context.fill();
-      // context.restore();
-    
       this._vueData.frameIndex = (frameToRender + 1 < animation.frames.length && frameToRender >= 0) ? frameToRender + 1 : 0;
       return frame;
     }
-
     async generateGif (animationName) {
       this._vueData.isPlaying = false;
       this._vueData.errorOccurred = false;
-
       this._setLog(`Creating GIF for ${animationName} [0.00%]`, true);
       try {
         const result = await this._frameMaker.toGif({
@@ -827,16 +692,13 @@ var App = (function () {
         });
         this._vueData.animationUrls[animationName] = result.url;
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.error(err);
         this._vueData.errorOccurred = true;
         this._setLog(`Error generating GIF for ${animationName}`, false);
         return;
       }
-
       this._setLog(`Successfully generated GIF for ${animationName}`, false);
     }
-
     async animate () {
       if (this._framesUntilRedraw <= 0) {
         const frame = await this.renderFrame();
@@ -844,12 +706,10 @@ var App = (function () {
       } else {
         this._framesUntilRedraw--;
       }
-
       if (this._vueData.isPlaying) {
         this._raf = requestAnimationFrame(() => this.animate());
       }
     }
-
     get frameMaker () {
       return this._frameMaker;
     }

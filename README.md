@@ -2,6 +2,7 @@
 
 ## Requirements
 * Node 8.9.4+ (lower version untested)
+* Latest version of Chrome or Firefox
 
 ## Setup
 

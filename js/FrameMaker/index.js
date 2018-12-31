@@ -302,7 +302,7 @@ export default class FrameMaker {
 
     const cgsFrame = animationEntry.frames[animationIndex];
     const cggFrame = this._frames[cgsFrame.frameIndex];
-    console.debug(`drawing frame [cgs:${animationIndex}, cgg:${cgsFrame.frameIndex}]`, cggFrame);
+    // console.debug(`drawing frame [cgs:${animationIndex}, cgg:${cgsFrame.frameIndex}]`, cggFrame);
 
     const tempCanvasSize = (spritesheets.reduce((acc, val) => Math.max(acc, val.width, val.height), Math.max(bounds.w + Math.abs(bounds.offset.left) * 2, bounds.h + Math.abs(bounds.offset.top) * 2))) * 2;
     // used as a temp canvas for rotating/flipping parts
