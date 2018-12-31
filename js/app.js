@@ -224,7 +224,7 @@ export default class App {
     this._vueApp.animationNames = animationNames;
     try {
       for (const name of animationNames) {
-        this._setProgress(animationNames.indexOf(name) + 1);
+        this._setProgress(((animationNames.indexOf(name) + 1) / animationNames.length) * 100);
         const animation = this._frameMaker.getAnimation(name);
         const numFrames = animation.frames.length;
         for (let i = 0; i < numFrames; ++i) {
