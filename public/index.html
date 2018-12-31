@@ -170,6 +170,10 @@
                                 </label>
                             </div>
                         </section>
+                        <section style="display: block; margin-top: 1em;">
+                            <span v-text="'Interested in making batches of GIFs? Consider using the command line script '"></span>
+                            <a href="https://github.com/BluuArc/BFFrameAnimator-js" target="_blank" rel="noopener" v-text="' here.'"></a>
+                        </section>
                     </section>
                 </div>
                 <div style="margin-bottom: 0;" class="progress" v-if="isLoading || majorProgress === 100">
@@ -187,7 +191,7 @@
                         Generate
                     </a>
                     <span style="text-align: right; display: flex; align-items: center; justify-content: flex-end;" v-if="formMessage">
-                        <div v-if="isLoading" class="preloader-wrapper active" style="flex: none; width: 1.5em; height: 1.5em;">
+                        <div v-if="isLoading" class="preloader-wrapper active" style="flex: none; width: 1.5em; height: 1.5em; margin-right: 0.5em;">
                             <div class="spinner-layer spinner-green-only">
                             <div class="circle-clipper left">
                                 <div class="circle"></div>
@@ -198,7 +202,7 @@
                             </div>
                             </div>
                         </div>
-                        <span v-text="formMessage" style="flex: 0 1 auto;" id="progress"></span>
+                        <span v-html="formMessage" style="flex: 0 1 auto;" id="progress"></span>
                     </span>
                 </div>
                 <div style="margin-top: 0;" class="progress" v-if="isLoading || minorProgress === 100">
