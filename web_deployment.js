@@ -5,7 +5,7 @@ const rp = require('request-promise');
 const request = require('request').defaults({ encoding: null });
 
 app.set('port', (process.env.PORT || 5000));
-app.use(express.static(__dirname + '\\public'));
+app.use(express.static('public'));
 
 app.use(function (req, res, next) {
   res.header('Access-Control-Allow-Origin', '*');
