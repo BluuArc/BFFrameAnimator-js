@@ -4,7 +4,6 @@
   "description": "",
   "main": "web_deployment.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node web_deployment.js",
     "clean-start": "npm run build && node web_deployment.js",
     "build": "rollup --config rollup.config.js",
@@ -27,6 +26,7 @@
     "yargs": "^8.0.2"
   },
   "devDependencies": {
+    "nodemon": "^1.18.9",
     "puppeteer": "^1.4.0"
   }
 }
