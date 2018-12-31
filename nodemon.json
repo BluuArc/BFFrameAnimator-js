@@ -1,0 +1,6 @@
+{
+  "ignore": [
+    "js/app-bundle.js",
+    "js/app-bundle.map.js"
+  ]
+}

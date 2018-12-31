@@ -1,1 +1,1 @@
-web: node web_deployment.js -p 5000
+web: npm run start

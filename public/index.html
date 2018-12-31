@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>BFFrameAnimator-js - v2</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css" integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/"
+        crossorigin="anonymous">
+    <style>
+        body {
+            background: aliceblue;
+        }
+    
+        /* canvas {
+            border: 1px solid black;
+        } */
+
+        .container {
+            display: flex;
+            align-items: center;
+        }
+
+        .container#app {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .container#app > .section {
+            padding-top: 0;
+        }
+
+        .container#app > .section > .card {
+            margin-bottom: 0;
+        }
+
+        .container > * {
+            flex: 1 1 100%;
+        }
+
+        .container#inputOptions {
+            flex-wrap: wrap;
+            width: 100%;
+            margin: 0;
+        }
+
+        .container#inputOptions > section {
+            flex-basis: 50%;
+            display: flex;
+        }
+
+        a {
+            text-align: center;
+        }
+
+        .card-action a.disabled {
+            pointer-events: none;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="container">
+        <div class="section">
+            <div class="container" style="flex-flow: column wrap;">
+                <h4 style="text-align: center;">BFFrameAnimator-js</h4>
+                <div class="container" style="margin: 0; justify-content: center; flex-wrap: wrap;">
+                    <a href="https://github.com/BluuArc/BFFrameAnimator" target="_blank" rel="noopener" style="flex: auto;">
+                        <h6>Original Java Version</h6>
+                    </a>
+                    <a href="https://github.com/BluuArc/BFFrameAnimator-js" target="_blank" rel="noopener" style="flex: auto;">
+                        <h6>GitHub Repository</h6>
+                    </a>
+                    <a href="v1.html" target="_blank" rel="noopener" style="flex: auto;">
+                        <h6>JS Version 1</h6>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="section">
+            <div class="card">
+                <div class="card-content">
+                    <span class="card-title">Options</span>
+                    <section class="container" id="inputOptions">
+                        <section class="container" style="margin: 0; min-width: 100%; margin-bottom: 1em;">
+                            <a
+                                :class="{ 'btn black-text': true, 'blue lighten-4': !isAdvancedInput, 'grey lighten-4': isAdvancedInput }"
+                                v-text="'Basic'"
+                                @click="isAdvancedInput = false"></a>
+                            <a
+                                :class="{ 'btn black-text': true, 'blue lighten-4': isAdvancedInput, 'grey lighten-4': !isAdvancedInput }"
+                                v-text="'Advanced'"
+                                @click="isAdvancedInput = true"></a>
+                        </section>
+                        <template v-if="!isAdvancedInput">
+                            <section>
+                                <div style="flex: 1 0 auto;">
+                                    <span>Unit ID</span>
+                                    <input type="text" v-model="unitId" id="unitId" class="browser-default" placeholder="BF Unit ID">
+                                </div>
+                            </section>
+                            <section>
+                                <span>Server</span>
+                                <div style="display: flex; flex: 1 1 auto;">
+                                    <label v-for="server in ['gl', 'eu', 'jp']" style="flex: 1 0 33%;">
+                                        <input name="server" type="radio" v-model="activeServer" :value="server">
+                                        <span v-text="server.toUpperCase()"></span>
+                                    </label>
+                                </div>
+                            </section>
+                        </template>
+                        <template v-else>
+                            <section style="flex-wrap: wrap; align-self: flex-start; margin-bottom: 1em;">
+                                <div style="flex: 1 0 100%; display: flex; justify-content: space-between;">
+                                    <div style="flex: 1 0 auto;">Spritesheets</div>
+                                    <div style="flex: 1 0 auto; display: flex; justify-content: flex-end;">
+                                        <a 
+                                            style="flex: 0 0 auto;"
+                                            :class="{ 'btn black-text': true, disabled: advancedSettings.numSpritesheets < 2 }" @click="advancedSettings.numSpritesheets = Math.max(advancedSettings.numSpritesheets - 1, 1)">
+                                            <i class="fas fa-minus-square"></i>
+                                        </a>
+                                        <a 
+                                            style="flex: 0 0 auto;"
+                                            class="btn black-text" @click="advancedSettings.numSpritesheets += 1">
+                                            <i class="fas fa-plus-square"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                                <section class="container" style="margin: 0; width: 100%; flex-wrap: wrap;">
+                                    <div v-for="(n, i) in advancedSettings.numSpritesheets" :key="i" style="flex: 0 0 95%; display: flex;">
+                                        <span style="flex: none;">Sheet {{ i }}</span>
+                                        <input style="flex: 1 0 auto;" type="text" v-model="advancedSettings.spritesheets[i]" class="browser-default" :placeholder="`Spritesheet ${i}`">
+                                    </div>
+                                </section>
+                            </section>
+                            <section style="flex-wrap: wrap; align-self: flex-start; max-width: 100%; margin-bottom: 1em;">
+                                <div style="flex: 1 0 100%; display: flex; justify-content: space-between;">
+                                    <div style="flex: 1 0 auto;">Animations</div>
+                                    <div style="flex: 1 0 auto; display: flex; justify-content: flex-end;">
+                                        <a 
+                                            style="flex: 0 0 auto;"
+                                            :class="{ 'btn black-text': true, disabled: advancedSettings.numAnimations < 2 }" @click="advancedSettings.numAnimations = Math.max(advancedSettings.numAnimations - 1, 1)">
+                                            <i class="fas fa-minus-square"></i>
+                                        </a>
+                                        <a 
+                                            style="flex: 0 0 auto;"
+                                            class="btn black-text" @click="advancedSettings.numAnimations += 1">
+                                            <i class="fas fa-plus-square"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                                <section class="container" style="margin: 0; width: 100%; flex-wrap: wrap;">
+                                    <div v-for="(n, i) in advancedSettings.numAnimations" :key="i" style="flex: 0 0 95%; display: flex; max-width: 100%;">
+                                        <input style="flex: 0 1 75px; min-width: 50px;" type="text" v-model="advancedSettings.animationNames[i]" class="browser-default" :placeholder="`Animation Name ${i}`">
+                                        <input style="flex: 1 1 auto;" type="text" v-model="advancedSettings.animations[i]" class="browser-default" :placeholder="`CGS CSV URL ${i}`">
+                                    </div>
+                                </section>
+                            </section>
+                            <section style="flex: 1 0 auto; max-width: 100%;">
+                                <span style="flex: none;">CGG CSV URL</span>
+                                <input style="flex: 1 0 auto;" type="text" v-model="advancedSettings.cgg"  class="browser-default" placeholder="CGG CSV URL">
+                            </section>
+                        </template>
+                        <section style="min-width: 100%;">
+                            <div style="flex: 1 0 100%; margin-top: 2em;">
+                                <label style="display: flex; align-items: center; flex-wrap: wrap;">
+                                    <input style="flex: none;" type="checkbox" v-model="doTrim" id="doTrim">
+                                    <span style="flex: 1 1 auto; height: auto;">Trim Whitespace (may clip out too much on some animations)</span>
+                                </label>
+                            </div>
+                        </section>
+                        <section style="display: block; margin-top: 1em;">
+                            <span v-text="'Interested in making batches of GIFs? Consider using the command line script '"></span>
+                            <a href="https://github.com/BluuArc/BFFrameAnimator-js" target="_blank" rel="noopener" v-text="' here.'"></a>
+                        </section>
+                    </section>
+                </div>
+                <div style="margin-bottom: 0;" class="progress" v-if="isLoading || majorProgress === 100">
+                    <div v-if="majorProgress >= 0" class="determinate" :style="`width: ${majorProgress}%`"></div>
+                    <div v-else class="indeterminate"></div>
+                </div>
+                <div
+                    :class="{ 'card-action container': true, 'grey lighten-3': isLoading, 'green lighten-4': !isLoading && animationReady, 'red lighten-4': !isLoading && errorOccurred }"
+                    style="margin: 0; justify-content: space-between; width: 100%;">
+                    <a
+                        @click="generateAnimation"
+                        href="#progress"
+                        :class="{ 'blue-text text-darken-2': !isLoading, 'grey-text text-darken-2': isLoading }"
+                        style="flex: none;">
+                        Generate
+                    </a>
+                    <span style="text-align: right; display: flex; align-items: center; justify-content: flex-end;" v-if="formMessage">
+                        <div v-if="isLoading" class="preloader-wrapper active" style="flex: none; width: 1.5em; height: 1.5em; margin-right: 0.5em;">
+                            <div class="spinner-layer spinner-green-only">
+                            <div class="circle-clipper left">
+                                <div class="circle"></div>
+                            </div><div class="gap-patch">
+                                <div class="circle"></div>
+                            </div><div class="circle-clipper right">
+                                <div class="circle"></div>
+                            </div>
+                            </div>
+                        </div>
+                        <span v-html="formMessage" style="flex: 0 1 auto;" id="progress"></span>
+                    </span>
+                </div>
+                <div style="margin-top: 0;" class="progress" v-if="isLoading || minorProgress === 100">
+                    <div v-if="minorProgress >= 0" class="determinate" :style="`width: ${minorProgress}%`"></div>
+                    <div v-else class="indeterminate"></div>
+                </div>
+            </div>
+        </div>
+        <div class="section">
+            <div class="card">
+                <div class="card-content">
+                    <span class="card-title">Animation</span>
+                    <span v-if="!animationReady">Generate an animation using the card above to be viewed here.</span>
+                    <div class="container" style="margin: 0; width: 100%; flex-direction: column;" v-show="animationReady">
+                        <section class="container" style="margin: 0; width: 100%;">
+                            <a  
+                                v-for="name in animationNames"
+                                :key="name"
+                                :class="{ 'btn black-text': true, 'blue lighten-4': activeAnimation === name, 'grey lighten-4': activeAnimation !== name }"
+                                v-text="name"
+                                @click="!isLoading && (activeAnimation = name);"></a>
+                        </section>
+                        <section v-show="activeAnimation" style="display: flex; min-width: 100%; flex-direction: column; align-items: center; max-width: 100%;">
+                            <canvas id="target" style="flex: none;"></canvas>
+                            <div class="container" style="margin: 0; width: 100%; max-width: 100%; overflow-x: auto; align-items: center;">
+                                <span style="flex: none;" v-text="`${(frameIndex+1).toString().padStart(numFrames.toString().length, '0')}/${numFrames}`"></span>
+                                <div class="progress" style="margin: 0;">
+                                    <div class="determinate" :style="{ width: `${(frameIndex + 1) / numFrames * 100}%` }"></div>
+                                </div>
+                            </div>
+                        </section>
+                        <section class="container" style="margin: 0; width: 100%;">
+                            <a :class="{ 'btn black-text': true, disabled: !activeAnimation || isPlaying || numFrames < 2 }" @click="renderFrame(frameIndex - 2)">
+                                <i class="fas fa-step-backward"></i>
+                            </a>
+                            <a :class="{ 'btn black-text': true, disabled: !activeAnimation || numFrames < 2 }" @click="isPlaying = !isPlaying;">
+                                <i :class="{ fas: true, 'fa-play': !isPlaying, 'fa-pause': isPlaying }"></i>
+                            </a>
+                            <a :class="{ 'btn black-text': true, disabled: !activeAnimation || isPlaying || numFrames < 2 }" @click="renderFrame()">
+                                <i class="fas fa-step-forward"></i>
+                            </a>
+                        </section>
+                    </div>
+                </div>
+                <div
+                    v-if="activeAnimation"
+                    :class="{ 'card-action': true, 'green lighten-4': !isLoading && animationUrls[activeAnimation], 'grey lighten-3': isLoading }">
+                    <a v-if="!animationUrls[activeAnimation]" @click="generateGif(activeAnimation)" href="#progress" :class="{ 'blue-text text-darken-2': !isLoading, 'grey-text text-darken-2': isLoading }">
+                        Generate {{ activeAnimation }} Animation
+                    </a>
+                    <a v-else :href="animationUrls[activeAnimation]" class="blue-text text-darken-2" target="_blank">
+                        Download {{ activeAnimation }} Animation
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="js/gif.js"></script>
+    <script src="js/app-bundle.js"></script>
+    <script>
+        app = new App();
+        // (() => {
+        //     app.init()
+        //         .then(() => {
+        //             app._vueData.animationReady = true;
+        //             console.log('ready');
+        //         }).catch(err => console.error(err));
+        // })();
+    </script>
+</body>
+</html>
