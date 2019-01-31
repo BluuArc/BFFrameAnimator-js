@@ -162,11 +162,23 @@
                                 <input style="flex: 1 0 auto;" type="text" v-model="advancedSettings.cgg"  class="browser-default" placeholder="CGG CSV URL">
                             </section>
                         </template>
-                        <section style="min-width: 100%;">
+                        <section style="min-width: 100%; flex-wrap: wrap;">
                             <div style="flex: 1 0 100%; margin-top: 2em;">
                                 <label style="display: flex; align-items: center; flex-wrap: wrap;">
                                     <input style="flex: none;" type="checkbox" v-model="doTrim" id="doTrim">
                                     <span style="flex: 1 1 auto; height: auto;">Trim Whitespace (may clip out too much on some animations)</span>
+                                </label>
+                            </div>
+                            <div style="flex: 1 0 100%; margin-top: 1em;">
+                                <label style="display: flex; align-items: center; flex-wrap: wrap;">
+                                    <input style="flex: none;" type="checkbox" v-model="doFlipHorizontal" id="doTrim">
+                                    <span style="flex: 1 1 auto; height: auto;">Flip Animation Horizontally</span>
+                                </label>
+                            </div>
+                            <div style="flex: 1 0 100%; margin-top: 1em;">
+                                <label style="display: flex; align-items: center; flex-wrap: wrap;">
+                                    <input style="flex: none;" type="checkbox" v-model="doFlipVertical" id="doTrim">
+                                    <span style="flex: 1 1 auto; height: auto;">Flip Animation Vertically</span>
                                 </label>
                             </div>
                         </section>

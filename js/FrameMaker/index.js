@@ -279,6 +279,8 @@ export default class FrameMaker {
     animationIndex = -1,
     referenceCanvas, // referenced for dimensions on first draw, otherwise optional
     forceRedraw = false,
+    flipHorizontal = false,
+    flipVertical = false,
     drawFrameBounds = false,
   }) {
     const animationEntry = this._animations[animationName];
@@ -417,6 +419,18 @@ export default class FrameMaker {
         /* eslint-enable no-console */
       }
     }
+    // flip the frame as needed
+    if (flipVertical || flipHorizontal) {
+      const flippedCanvas = document.createElement('canvas');
+      flippedCanvas.width = frameCanvas.width;
+      flippedCanvas.height = frameCanvas.height;
+      const flippedContext = flippedCanvas.getContext('2d');
+      flippedContext.scale(flipHorizontal ? -1 : 1, flipVertical ? -1 : 1);
+      flippedContext.translate(flipHorizontal ? -flippedCanvas.width : 0, flipVertical ? -flippedCanvas.height : 0);
+      flippedContext.drawImage(frameCanvas, 0, 0);
+      frameContext.clearRect(0, 0, frameCanvas.width, frameCanvas.height);
+      frameContext.drawImage(flippedCanvas, 0, 0);
+    }
     if (drawFrameBounds) {
       console.debug('drawing frame bounds', bounds, origin);
       frameContext.save();
@@ -449,6 +463,8 @@ export default class FrameMaker {
     animationName = 'name', animationIndex = -1,
     targetCanvas = document.createElement('canvas'),
     forceRedraw = false,
+    flipHorizontal = false,
+    flipVertical = false,
     drawFrameBounds = false,
   }) {
     const frameCanvas = await this.getFrame({
@@ -457,6 +473,8 @@ export default class FrameMaker {
       animationIndex,
       referenceCanvas: targetCanvas,
       forceRedraw,
+      flipHorizontal,
+      flipVertical,
       drawFrameBounds,
     });
     targetCanvas.getContext('2d').drawImage(frameCanvas, 0, 0);
@@ -467,6 +485,8 @@ export default class FrameMaker {
     animationName = 'name',
     referenceCanvas, // referenced for dimensions on first draw, otherwise optional
     forceRedraw = false,
+    flipHorizontal = false,
+    flipVertical = false,
     drawFrameBounds = false,
     GifClass,
     useTransparency = true,
@@ -493,6 +513,8 @@ export default class FrameMaker {
           animationIndex: i,
           referenceCanvas,
           forceRedraw,
+          flipHorizontal,
+          flipVertical,
           drawFrameBounds,
         });
         const delay = Math.floor(frame.dataset.delay / 60 * 1000);

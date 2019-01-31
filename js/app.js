@@ -23,6 +23,8 @@ export default class App {
       unitId: '',
       activeServer: 'gl',
       doTrim: false,
+      doFlipHorizontal: false,
+      doFlipVertical: false,
       formMessage: 'Input your options above then press "Generate" to start generating an animation.',
       errorOccurred: false,
       activeAnimation: '',
@@ -235,6 +237,8 @@ export default class App {
             spritesheets: this._spritesheets,
             animationName: name,
             animationIndex: i,
+            flipHorizontal: this._vueData.doFlipHorizontal,
+            flipVertical: this._vueData.doFlipVertical,
             drawFrameBounds: false, // set true for debugging
           });
         }
