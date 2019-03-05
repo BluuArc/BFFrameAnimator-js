@@ -8,7 +8,8 @@
     "clean-start": "npm run build && node web_deployment.js",
     "build": "rollup --config rollup.config.js",
     "dev": "nodemon --exec \"npm run clean-start\" --config nodemon.json",
-    "generate-gifs": "node generate-gifs-desktop.js"
+    "generate-gifs": "node generate-gifs-desktop.js",
+    "heroku-postbuild": "echo Skip build on Heroku"
   },
   "author": "Joshua Castor",
   "license": "MIT",
@@ -28,5 +29,6 @@
   "devDependencies": {
     "nodemon": "^1.18.9",
     "puppeteer": "^1.4.0"
-  }
+  },
+  "heroku-run-build-script": true
 }
