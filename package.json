@@ -28,7 +28,7 @@
   },
   "devDependencies": {
     "nodemon": "^1.18.9",
-    "puppeteer": "^1.4.0"
+    "puppeteer": "^1.18.1"
   },
   "heroku-run-build-script": true
 }
