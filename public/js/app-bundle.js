@@ -98,7 +98,7 @@ var App = (function () {
     static async fromBraveFrontierUnit (id = '10011', server = 'gl', doTrim = false) {
       const serverUrls = {
         eu: 'http://static-bravefrontier.gumi-europe.net/content/',
-        gl: 'http://2.cdn.bravefrontier.gumi.sg/content/',
+        gl: 'https://dv5bk1m8igv7v.cloudfront.net/asset/2220/content/',
         jp: 'http://cdn.android.brave.a-lim.jp/',
       };
       const filepaths = {
