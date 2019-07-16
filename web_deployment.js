@@ -44,7 +44,7 @@ app.get('/getImage/:url',function (req, res){
       res.contentType('image/png');
       res.end(new Buffer(body).toString('base64'), 'base64');
     } else {
-      res.status(response.statusCode).send(response.statusMessage).end();
+      res.status((response && response.statusCode) || 500).send((response && response.statusMessage) || err.Error).end();
     }
   });
 });
