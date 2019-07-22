@@ -36,15 +36,25 @@ app.get('/getjson/:url', function (req, res) {
 });
 
 app.get('/getImage/:url',function (req, res){
-  console.log(req.params.url);
+  const format = req.query.format || 'image/png';
+  console.log(req.params.url, format);
   const decodedPath = decodeURIComponent(req.params.url);
   // based on https://stackoverflow.com/questions/17124053/node-js-get-image-from-web-and-encode-with-base64
   request.get(decodedPath, function (err, response, body){
-    if(!err && response.statusCode === 200){
-      res.contentType('image/png');
-      res.end(new Buffer(body).toString('base64'), 'base64');
-    } else {
-      res.status((response && response.statusCode) || 500).send((response && response.statusMessage) || err.Error).end();
+    try {
+      if (!err && response.statusCode === 200){
+        res.contentType(format);
+        const imageData = Buffer.from(body).toString('base64');
+        if (format !== 'text/plain') {
+          res.end(imageData, 'base64');
+        } else {
+          res.end(imageData);
+        }
+      } else {
+        res.status((response && response.statusCode) || 500).send((response && response.statusMessage) || err.Error).end();
+      }
+    } catch (err) {
+      res.status(500).send(err).end();
     }
   });
 });
