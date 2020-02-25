@@ -40,6 +40,8 @@ const calculateAnimationBounds = greenlet(function (cgsEntry = [], frames = [], 
   };
 });
 
+const TRANSPARENCY_COLOR = 'rgb(100, 100, 100)';
+
 export default class FrameMaker {
   constructor (cggCsv = []) {
     this._frames = this._processCgg(cggCsv);
@@ -328,7 +330,10 @@ export default class FrameMaker {
       try {
         const sourceWidth = part.img.width, sourceHeight = part.img.height;
         tempContext.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+        // tempContext.fillStyle = TRANSPARENCY_COLOR;
+        // tempContext.fillRect(0, 0, frameCanvas.width, frameCanvas.height);
         tempContext.globalAlpha = part.opacity / 100;
+
 
         const flipX = part.flipType === 1 || part.flipType === 3;
         const flipY = part.flipType === 2 || part.flipType === 3;
@@ -496,7 +501,9 @@ export default class FrameMaker {
       workerScript: 'js/gif.worker.js',
       copy: true,
       quality: 1,
-      transparent: useTransparency ? 'rgba(0,0,0,0)' : undefined
+      background: 'rgb(0,0,0)', // color to render background with
+      transparent: TRANSPARENCY_COLOR, // TODO: figure out why this doesn't seem to work
+      dispose: 2,
     });
 
     const animationEntry = this._animations[animationName];

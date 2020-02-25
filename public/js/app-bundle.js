@@ -55,6 +55,7 @@ var App = (function () {
       },
     };
   });
+  const TRANSPARENCY_COLOR = 'rgb(100, 100, 100)';
   class FrameMaker {
     constructor (cggCsv = []) {
       this._frames = this._processCgg(cggCsv);
@@ -435,7 +436,9 @@ var App = (function () {
         workerScript: 'js/gif.worker.js',
         copy: true,
         quality: 1,
-        transparent: useTransparency ? 'rgba(0,0,0,0)' : undefined
+        background: 'rgb(0,0,0)',
+        transparent: TRANSPARENCY_COLOR,
+        dispose: 2,
       });
       const animationEntry = this._animations[animationName];
       if (!animationEntry) {
