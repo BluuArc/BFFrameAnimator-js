@@ -40,6 +40,8 @@ const calculateAnimationBounds = greenlet(function (cgsEntry = [], frames = [], 
   };
 });
 
+const TRANSPARENCY_COLOR = 'rgb(100, 100, 100)';
+
 export default class FrameMaker {
   constructor (cggCsv = []) {
     this._frames = this._processCgg(cggCsv);
@@ -88,7 +90,7 @@ export default class FrameMaker {
   static async fromBraveFrontierUnit (id = '10011', server = 'gl', doTrim = false) {
     const serverUrls = {
       eu: 'http://static-bravefrontier.gumi-europe.net/content/',
-      gl: 'https://dv5bk1m8igv7v.cloudfront.net/asset/2220/content/',
+      gl: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/',
       jp: 'http://cdn.android.brave.a-lim.jp/',
     };
     const filepaths = {
@@ -273,6 +275,9 @@ export default class FrameMaker {
   }
 
 
+  /**
+   * @returns {Promise<HTMLCanvasElement>}
+   */
   async getFrame({
     spritesheets = [], // array of img elements containing sprite sheets
     animationName = 'name',
@@ -329,6 +334,7 @@ export default class FrameMaker {
         const sourceWidth = part.img.width, sourceHeight = part.img.height;
         tempContext.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
         tempContext.globalAlpha = part.opacity / 100;
+
 
         const flipX = part.flipType === 1 || part.flipType === 3;
         const flipY = part.flipType === 2 || part.flipType === 3;
@@ -480,6 +486,24 @@ export default class FrameMaker {
     targetCanvas.getContext('2d').drawImage(frameCanvas, 0, 0);
   }
 
+  /**
+   * @description used to hide black outlines from results due to low opacities
+   * @param {HTMLCanvasElement} frame
+   */
+  createFilteredFrameByAlpha (frame) {
+    const context = frame.getContext('2d');
+    const imageData = context.getImageData(0, 0, frame.width, frame.height);
+    const pixels = imageData.data;
+    const pixelDataLength = pixels.length;
+    for (let i = 0; i < pixelDataLength; i += 4) {
+      const currentPixelAlpha = pixels[i + 3];
+      if (currentPixelAlpha < 100) {
+        pixels[i + 3] = 0;
+      }
+    }
+    context.putImageData(imageData, 0, 0);
+  }
+
   async toGif ({
     spritesheets = [], // array of img elements containing sprite sheets
     animationName = 'name',
@@ -496,7 +520,9 @@ export default class FrameMaker {
       workerScript: 'js/gif.worker.js',
       copy: true,
       quality: 1,
-      transparent: useTransparency ? 'rgba(0,0,0,0)' : undefined
+      background: 'rgb(0,0,0)', // color to render background with
+      transparent: useTransparency ? TRANSPARENCY_COLOR : null,
+      dispose: 2,
     });
 
     const animationEntry = this._animations[animationName];
@@ -517,6 +543,7 @@ export default class FrameMaker {
           flipVertical,
           drawFrameBounds,
         });
+        this.createFilteredFrameByAlpha(frame);
         const delay = Math.floor(frame.dataset.delay / 60 * 1000);
         gif.addFrame(frame, { delay });
   

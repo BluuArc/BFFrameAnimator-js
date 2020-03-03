@@ -55,6 +55,7 @@ var App = (function () {
       },
     };
   });
+  const TRANSPARENCY_COLOR = 'rgb(100, 100, 100)';
   class FrameMaker {
     constructor (cggCsv = []) {
       this._frames = this._processCgg(cggCsv);
@@ -98,7 +99,7 @@ var App = (function () {
     static async fromBraveFrontierUnit (id = '10011', server = 'gl', doTrim = false) {
       const serverUrls = {
         eu: 'http://static-bravefrontier.gumi-europe.net/content/',
-        gl: 'https://dv5bk1m8igv7v.cloudfront.net/asset/2220/content/',
+        gl: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/',
         jp: 'http://cdn.android.brave.a-lim.jp/',
       };
       const filepaths = {
@@ -419,6 +420,19 @@ var App = (function () {
       });
       targetCanvas.getContext('2d').drawImage(frameCanvas, 0, 0);
     }
+    createFilteredFrameByAlpha (frame) {
+      const context = frame.getContext('2d');
+      const imageData = context.getImageData(0, 0, frame.width, frame.height);
+      const pixels = imageData.data;
+      const pixelDataLength = pixels.length;
+      for (let i = 0; i < pixelDataLength; i += 4) {
+        const currentPixelAlpha = pixels[i + 3];
+        if (currentPixelAlpha < 100) {
+          pixels[i + 3] = 0;
+        }
+      }
+      context.putImageData(imageData, 0, 0);
+    }
     async toGif ({
       spritesheets = [],
       animationName = 'name',
@@ -435,7 +449,9 @@ var App = (function () {
         workerScript: 'js/gif.worker.js',
         copy: true,
         quality: 1,
-        transparent: useTransparency ? 'rgba(0,0,0,0)' : undefined
+        background: 'rgb(0,0,0)',
+        transparent: useTransparency ? TRANSPARENCY_COLOR : null,
+        dispose: 2,
       });
       const animationEntry = this._animations[animationName];
       if (!animationEntry) {
@@ -454,6 +470,7 @@ var App = (function () {
             flipVertical,
             drawFrameBounds,
           });
+          this.createFilteredFrameByAlpha(frame);
           const delay = Math.floor(frame.dataset.delay / 60 * 1000);
           gif.addFrame(frame, { delay });
         }
@@ -502,15 +519,15 @@ var App = (function () {
         advancedSettings: {
           numSpritesheets: 2,
           spritesheets: {
-            0: 'http://dlc.bfglobal.gumi.sg/content/unit/img/unit_anime_10101905_L.png',
-            1: 'http://dlc.bfglobal.gumi.sg/content/unit/img/unit_anime_10101905_U.png',
+            0: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/unit/img/unit_anime_10101905_L.png',
+            1: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/unit/img/unit_anime_10101905_U.png',
           },
-          cgg: 'http://dlc.bfglobal.gumi.sg/content/unit/cgg/unit_cgg_10101901.csv',
+          cgg: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/unit/cgg/unit_cgg_10101901.csv',
           numAnimations: 3,
           animations: {
-            0: 'http://dlc.bfglobal.gumi.sg/content/unit/cgs/unit_idle_cgs_10101901.csv',
-            1: 'http://dlc.bfglobal.gumi.sg/content/unit/cgs/unit_move_cgs_10101901.csv',
-            2: 'http://dlc.bfglobal.gumi.sg/content/unit/cgs/unit_atk_cgs_10101901.csv',
+            0: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/unit/cgs/unit_idle_cgs_10101901.csv',
+            1: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/unit/cgs/unit_move_cgs_10101901.csv',
+            2: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/unit/cgs/unit_atk_cgs_10101901.csv',
           },
           animationNames: {
             0: 'idle',

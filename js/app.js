@@ -37,15 +37,15 @@ export default class App {
       advancedSettings: {
         numSpritesheets: 2,
         spritesheets: {
-          0: 'http://dlc.bfglobal.gumi.sg/content/unit/img/unit_anime_10101905_L.png',
-          1: 'http://dlc.bfglobal.gumi.sg/content/unit/img/unit_anime_10101905_U.png',
+          0: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/unit/img/unit_anime_10101905_L.png',
+          1: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/unit/img/unit_anime_10101905_U.png',
         },
-        cgg: 'http://dlc.bfglobal.gumi.sg/content/unit/cgg/unit_cgg_10101901.csv',
+        cgg: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/unit/cgg/unit_cgg_10101901.csv',
         numAnimations: 3,
         animations: {
-          0: 'http://dlc.bfglobal.gumi.sg/content/unit/cgs/unit_idle_cgs_10101901.csv',
-          1: 'http://dlc.bfglobal.gumi.sg/content/unit/cgs/unit_move_cgs_10101901.csv',
-          2: 'http://dlc.bfglobal.gumi.sg/content/unit/cgs/unit_atk_cgs_10101901.csv',
+          0: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/unit/cgs/unit_idle_cgs_10101901.csv',
+          1: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/unit/cgs/unit_move_cgs_10101901.csv',
+          2: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/unit/cgs/unit_atk_cgs_10101901.csv',
         },
         animationNames: {
           0: 'idle',
