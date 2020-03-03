@@ -99,7 +99,7 @@ var App = (function () {
     static async fromBraveFrontierUnit (id = '10011', server = 'gl', doTrim = false) {
       const serverUrls = {
         eu: 'http://static-bravefrontier.gumi-europe.net/content/',
-        gl: 'https://dv5bk1m8igv7v.cloudfront.net/asset/2220/content/',
+        gl: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/',
         jp: 'http://cdn.android.brave.a-lim.jp/',
       };
       const filepaths = {
@@ -517,17 +517,22 @@ var App = (function () {
         animationUrls: {},
         isAdvancedInput: false,
         advancedSettings: {
-          numSpritesheets: 1,
+          numSpritesheets: 2,
           spritesheets: {
-            0: 'http://localhost:8080/50465/unit_anime_50465.png',
+            0: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/unit/img/unit_anime_10101905_L.png',
+            1: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/unit/img/unit_anime_10101905_U.png',
           },
-          cgg: 'http://localhost:8080/50465/unit_cgg_50465.csv',
-          numAnimations: 1,
+          cgg: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/unit/cgg/unit_cgg_10101901.csv',
+          numAnimations: 3,
           animations: {
-            0: 'http://localhost:8080/50465/unit_atk_cgs_50465.csv',
+            0: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/unit/cgs/unit_idle_cgs_10101901.csv',
+            1: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/unit/cgs/unit_move_cgs_10101901.csv',
+            2: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/unit/cgs/unit_atk_cgs_10101901.csv',
           },
           animationNames: {
-            0: 'atk',
+            0: 'idle',
+            1: 'move',
+            2: 'atk',
           },
         },
         majorProgress: Infinity,
