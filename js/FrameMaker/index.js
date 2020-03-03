@@ -275,6 +275,9 @@ export default class FrameMaker {
   }
 
 
+  /**
+   * @returns {Promise<HTMLCanvasElement>}
+   */
   async getFrame({
     spritesheets = [], // array of img elements containing sprite sheets
     animationName = 'name',
@@ -330,8 +333,6 @@ export default class FrameMaker {
       try {
         const sourceWidth = part.img.width, sourceHeight = part.img.height;
         tempContext.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
-        // tempContext.fillStyle = TRANSPARENCY_COLOR;
-        // tempContext.fillRect(0, 0, frameCanvas.width, frameCanvas.height);
         tempContext.globalAlpha = part.opacity / 100;
 
 
@@ -485,6 +486,24 @@ export default class FrameMaker {
     targetCanvas.getContext('2d').drawImage(frameCanvas, 0, 0);
   }
 
+  /**
+   * @description used to hide black outlines from results due to low opacities
+   * @param {HTMLCanvasElement} frame
+   */
+  createFilteredFrameByAlpha (frame) {
+    const context = frame.getContext('2d');
+    const imageData = context.getImageData(0, 0, frame.width, frame.height);
+    const pixels = imageData.data;
+    const pixelDataLength = pixels.length;
+    for (let i = 0; i < pixelDataLength; i += 4) {
+      const currentPixelAlpha = pixels[i + 3];
+      if (currentPixelAlpha < 100) {
+        pixels[i + 3] = 0;
+      }
+    }
+    context.putImageData(imageData, 0, 0);
+  }
+
   async toGif ({
     spritesheets = [], // array of img elements containing sprite sheets
     animationName = 'name',
@@ -502,7 +521,7 @@ export default class FrameMaker {
       copy: true,
       quality: 1,
       background: 'rgb(0,0,0)', // color to render background with
-      transparent: TRANSPARENCY_COLOR, // TODO: figure out why this doesn't seem to work
+      transparent: useTransparency ? TRANSPARENCY_COLOR : null,
       dispose: 2,
     });
 
@@ -524,6 +543,7 @@ export default class FrameMaker {
           flipVertical,
           drawFrameBounds,
         });
+        this.createFilteredFrameByAlpha(frame);
         const delay = Math.floor(frame.dataset.delay / 60 * 1000);
         gif.addFrame(frame, { delay });
   

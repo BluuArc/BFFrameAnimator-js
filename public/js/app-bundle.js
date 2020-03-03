@@ -420,6 +420,19 @@ var App = (function () {
       });
       targetCanvas.getContext('2d').drawImage(frameCanvas, 0, 0);
     }
+    createFilteredFrameByAlpha (frame) {
+      const context = frame.getContext('2d');
+      const imageData = context.getImageData(0, 0, frame.width, frame.height);
+      const pixels = imageData.data;
+      const pixelDataLength = pixels.length;
+      for (let i = 0; i < pixelDataLength; i += 4) {
+        const currentPixelAlpha = pixels[i + 3];
+        if (currentPixelAlpha < 100) {
+          pixels[i + 3] = 0;
+        }
+      }
+      context.putImageData(imageData, 0, 0);
+    }
     async toGif ({
       spritesheets = [],
       animationName = 'name',
@@ -437,7 +450,7 @@ var App = (function () {
         copy: true,
         quality: 1,
         background: 'rgb(0,0,0)',
-        transparent: TRANSPARENCY_COLOR,
+        transparent: useTransparency ? TRANSPARENCY_COLOR : null,
         dispose: 2,
       });
       const animationEntry = this._animations[animationName];
@@ -457,6 +470,7 @@ var App = (function () {
             flipVertical,
             drawFrameBounds,
           });
+          this.createFilteredFrameByAlpha(frame);
           const delay = Math.floor(frame.dataset.delay / 60 * 1000);
           gif.addFrame(frame, { delay });
         }
@@ -503,22 +517,17 @@ var App = (function () {
         animationUrls: {},
         isAdvancedInput: false,
         advancedSettings: {
-          numSpritesheets: 2,
+          numSpritesheets: 1,
           spritesheets: {
-            0: 'http://dlc.bfglobal.gumi.sg/content/unit/img/unit_anime_10101905_L.png',
-            1: 'http://dlc.bfglobal.gumi.sg/content/unit/img/unit_anime_10101905_U.png',
+            0: 'http://localhost:8080/50465/unit_anime_50465.png',
           },
-          cgg: 'http://dlc.bfglobal.gumi.sg/content/unit/cgg/unit_cgg_10101901.csv',
-          numAnimations: 3,
+          cgg: 'http://localhost:8080/50465/unit_cgg_50465.csv',
+          numAnimations: 1,
           animations: {
-            0: 'http://dlc.bfglobal.gumi.sg/content/unit/cgs/unit_idle_cgs_10101901.csv',
-            1: 'http://dlc.bfglobal.gumi.sg/content/unit/cgs/unit_move_cgs_10101901.csv',
-            2: 'http://dlc.bfglobal.gumi.sg/content/unit/cgs/unit_atk_cgs_10101901.csv',
+            0: 'http://localhost:8080/50465/unit_atk_cgs_50465.csv',
           },
           animationNames: {
-            0: 'idle',
-            1: 'move',
-            2: 'atk',
+            0: 'atk',
           },
         },
         majorProgress: Infinity,
