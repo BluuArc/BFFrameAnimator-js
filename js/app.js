@@ -37,7 +37,7 @@ export default class App {
         { label: 'None', value: 'None' },
         { label: 'Black', value: '#000000' },
         { label: 'White', value: '#FFFFFF' },
-        { label: 'Discord Chat Dark', value: '#2C2F33' },
+        { label: 'Discord Chat Dark', value: '#36393f' },
         { label: 'BF Wiki Table Background', value: '#FAFAFA' },
         { label: 'Other', value: 'Other' }
       ],

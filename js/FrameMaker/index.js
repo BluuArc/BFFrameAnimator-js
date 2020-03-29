@@ -486,22 +486,63 @@ export default class FrameMaker {
     targetCanvas.getContext('2d').drawImage(frameCanvas, 0, 0);
   }
 
+  hexToRgb (hexString = '') {
+    const nonHashString = hexString.startsWith('#') ? hexString.slice(1) : hexString;
+    const hexValue = parseInt(nonHashString, 16);
+    const HEX_MASK = 0xFF;
+    return {
+      red: (hexValue >> 16) & HEX_MASK,
+      green: (hexValue >> 8) & HEX_MASK,
+      blue: hexValue & HEX_MASK,
+    };
+  }
+
   /**
    * @description used to hide black outlines from results due to low opacities
    * @param {HTMLCanvasElement} frame
+   * @param {Object} options
+   * @returns {HTMLCanvasElement}
    */
-  createFilteredFrameByAlpha (frame) {
+  createFilteredFrameByAlpha (frame, { limitingAlpha = 100, backgroundColor } = {}) {
     const context = frame.getContext('2d');
     const imageData = context.getImageData(0, 0, frame.width, frame.height);
+    const newFrame = document.createElement('canvas');
+    newFrame.width = frame.width;
+    newFrame.height = frame.height;
+    const newFrameContext = newFrame.getContext('2d');
     const pixels = imageData.data;
     const pixelDataLength = pixels.length;
+    const rgbColor = this.hexToRgb(backgroundColor);
     for (let i = 0; i < pixelDataLength; i += 4) {
       const currentPixelAlpha = pixels[i + 3];
-      if (currentPixelAlpha < 100) {
-        pixels[i + 3] = 0;
+      if (currentPixelAlpha < limitingAlpha) {
+        if (!backgroundColor) {
+          pixels[i + 3] = 0;
+        } else {
+          pixels[i] = rgbColor.red;
+          pixels[i + 1] = rgbColor.green;
+          pixels[i + 2] = rgbColor.blue;
+          pixels[i + 3] = 255;
+        }
       }
     }
-    context.putImageData(imageData, 0, 0);
+    newFrameContext.putImageData(imageData, 0, 0);
+    return newFrame;
+  }
+
+  /**
+   * @param {HTMLCanvasElement} frame
+   * @param {String} backgroundColor
+   */
+  createFrameWithBackground(frame, backgroundColor) {
+    const newFrame = document.createElement('canvas');
+    newFrame.width = frame.width;
+    newFrame.height = frame.height;
+    const newFrameContext = newFrame.getContext('2d');
+    newFrameContext.fillStyle = backgroundColor;
+    newFrameContext.fillRect(0, 0, frame.width, frame.height);
+    newFrameContext.drawImage(frame, 0, 0);
+    return newFrame;
   }
 
   async toGif ({
@@ -521,7 +562,7 @@ export default class FrameMaker {
       workerScript: 'js/gif.worker.js',
       copy: true,
       quality: 1,
-      background: backgroundColor || 'rgb(0,0,0)', // color to render background with
+      background: 'rgb(0,0,0)', // color to render background with
       transparent: useTransparency ? TRANSPARENCY_COLOR : null,
       dispose: 2,
     });
@@ -536,7 +577,7 @@ export default class FrameMaker {
     if (!animationEntry.gif[backgroundColor]) {
       const numFrames = animationEntry.frames.length;
       for (let i = 0; i < numFrames; ++i) {
-        const frame = await this.getFrame({
+        const originalFrame = await this.getFrame({
           spritesheets,
           animationName,
           animationIndex: i,
@@ -546,12 +587,15 @@ export default class FrameMaker {
           flipVertical,
           drawFrameBounds,
         });
-        if (!backgroundColor) {
-          this.createFilteredFrameByAlpha(frame);
+
+        let frame;
+        if (backgroundColor) {
+          frame = this.createFrameWithBackground(originalFrame, backgroundColor);
+        } else {
+          frame = this.createFilteredFrameByAlpha(originalFrame);
         }
-        const delay = Math.floor(frame.dataset.delay / 60 * 1000);
+        const delay = Math.floor(originalFrame.dataset.delay / 60 * 1000);
         gif.addFrame(frame, { delay });
-  
       }
       const blob = await new Promise((fulfill) => {
         if (typeof onProgressUpdate === 'function') {

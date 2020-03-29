@@ -251,7 +251,7 @@
                             <section role="radiogroup" aria-labelledby="animationGroupLabel">
                                 <p id="animationGroupLabel">Active Animation</p>
                                 <label v-for="name in animationNames" :key="name" style="display: block;">
-                                    <input type="radio" name="animationName" v-model="activeAnimation" :value="name">
+                                    <input type="radio" name="animationName" v-model="activeAnimation" :value="name" :disabled="isLoading">
                                     <span style="text-transform: capitalize;">{{ name }}</span>
                                 </label>
                             </section>
@@ -264,6 +264,7 @@
                                         v-model="activeBackgroundColor"
                                         type="radio"
                                         name="backgroundColor"
+                                        :disabled="isLoading"
                                         :value="entry.value">
                                     <span>{{ entry.label }}</span>
                                     <span
@@ -279,7 +280,7 @@
                                         </datalist>
                                         <input
                                             v-model="customBackgroundColor"
-                                            :disabled="activeBackgroundColor !== 'Other'"
+                                            :disabled="activeBackgroundColor !== 'Other' || isLoading"
                                             type="color"
                                             name="customBackgroundColor"
                                             list="backgroundColors"
