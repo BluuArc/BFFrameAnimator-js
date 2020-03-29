@@ -444,12 +444,13 @@ var App = (function () {
       GifClass,
       useTransparency = true,
       onProgressUpdate,
+      backgroundColor,
     }) {
       const gif = new GifClass({
         workerScript: 'js/gif.worker.js',
         copy: true,
         quality: 1,
-        background: 'rgb(0,0,0)',
+        background: backgroundColor || 'rgb(0,0,0)',
         transparent: useTransparency ? TRANSPARENCY_COLOR : null,
         dispose: 2,
       });
@@ -457,7 +458,8 @@ var App = (function () {
       if (!animationEntry) {
         throw new Error(`No animation entry found with name ${animationName}`);
       }
-      if (!animationEntry.gif) {
+      animationEntry.gif = animationEntry.gif || {};
+      if (!animationEntry.gif[backgroundColor]) {
         const numFrames = animationEntry.frames.length;
         for (let i = 0; i < numFrames; ++i) {
           const frame = await this.getFrame({
@@ -470,7 +472,9 @@ var App = (function () {
             flipVertical,
             drawFrameBounds,
           });
-          this.createFilteredFrameByAlpha(frame);
+          if (!backgroundColor) {
+            this.createFilteredFrameByAlpha(frame);
+          }
           const delay = Math.floor(frame.dataset.delay / 60 * 1000);
           gif.addFrame(frame, { delay });
         }
@@ -481,12 +485,12 @@ var App = (function () {
           gif.on('finished', blob => fulfill(blob));
           gif.render();
         });
-        animationEntry.gif = {
+        animationEntry.gif[backgroundColor] = {
           url: URL.createObjectURL(blob),
           blob: await this._blobToBase64(blob),
         };
       }
-      return animationEntry.gif;
+      return animationEntry.gif[backgroundColor];
     }
   }
 
@@ -507,6 +511,17 @@ var App = (function () {
         doTrim: false,
         doFlipHorizontal: false,
         doFlipVertical: false,
+        activeBackgroundColor: 'None',
+        customBackgroundColor: '#000000',
+        generatedColor: '',
+        defaultColors: [
+          { label: 'None', value: 'None' },
+          { label: 'Black', value: '#000000' },
+          { label: 'White', value: '#FFFFFF' },
+          { label: 'Discord Chat Dark', value: '#2C2F33' },
+          { label: 'BF Wiki Table Background', value: '#FAFAFA' },
+          { label: 'Other', value: 'Other' }
+        ],
         formMessage: 'Input your options above then press "Generate" to start generating an animation.',
         errorOccurred: false,
         activeAnimation: '',
@@ -549,6 +564,12 @@ var App = (function () {
               this.renderFrame(-Infinity);
             }
           },
+          activeBackgroundColor: () => {
+            this.renderFrame(this._vueData.frameIndex, { noIncrement: true });
+          },
+          customBackgroundColor: () => {
+            this.renderFrame(this._vueData.frameIndex, { noIncrement: true });
+          },
           isPlaying: (newValue) => {
             if (this._raf) {
               cancelAnimationFrame(this._raf);
@@ -579,9 +600,17 @@ var App = (function () {
           renderFrame: (...args) => this.renderFrame(...args),
           generateGif: (...args) => this.generateGif(...args),
           animate: () => this.animate(),
+          generateColorPreviewStyles: (color) => `width: 2em; background: ${color}; height: 1em; border: 1px solid black; display: inline-block;`,
         },
       });
       this._targetCanvas = document.querySelector('canvas#target');
+    }
+    getBackgroundColor () {
+      let color = '';
+      if (this._vueData.activeBackgroundColor !== 'None') {
+        color = this._vueData.activeBackgroundColor !== 'Other' ? this._vueData.activeBackgroundColor : this._vueData.customBackgroundColor;
+      }
+      return color;
     }
     async init () {
       const targetCanvas = document.querySelector('canvas#target');
@@ -734,8 +763,15 @@ var App = (function () {
       }
       const context = this._targetCanvas.getContext('2d');
       context.clearRect(0, 0, this._targetCanvas.width, this._targetCanvas.height);
+      const backgroundColor = this.getBackgroundColor();
+      if (backgroundColor) {
+        context.fillStyle = backgroundColor;
+        context.fillRect(0, 0, this._targetCanvas.width, this._targetCanvas.height);
+      }
       context.drawImage(frame, 0, 0);
-      this._vueData.frameIndex = (frameToRender + 1 < animation.frames.length && frameToRender >= 0) ? frameToRender + 1 : 0;
+      if (!options.noIncrement) {
+        this._vueData.frameIndex = (frameToRender + 1 < animation.frames.length && frameToRender >= 0) ? frameToRender + 1 : 0;
+      }
       return frame;
     }
     async generateGif (animationName) {
@@ -745,6 +781,7 @@ var App = (function () {
       this._setProgress(Infinity, 0);
       await waitForIdleFrame();
       try {
+        const backgroundColor = this.getBackgroundColor();
         const result = await this._frameMaker.toGif({
           spritesheets: this._spritesheets,
           animationName,
@@ -753,8 +790,10 @@ var App = (function () {
             this._setLog(`Creating GIF [${(amt * 100).toFixed(2)}%]`);
             this._setProgress(undefined, Math.floor(amt * 100));
           },
+          backgroundColor,
         });
         this._vueData.animationUrls[animationName] = result.url;
+        this._vueData.generatedColor = backgroundColor || this._vueData.activeBackgroundColor;
       } catch (err) {
         console.error(err);
         this._vueData.errorOccurred = true;

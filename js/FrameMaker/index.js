@@ -515,12 +515,13 @@ export default class FrameMaker {
     GifClass,
     useTransparency = true,
     onProgressUpdate,
+    backgroundColor,
   }) {
     const gif = new GifClass({
       workerScript: 'js/gif.worker.js',
       copy: true,
       quality: 1,
-      background: 'rgb(0,0,0)', // color to render background with
+      background: backgroundColor || 'rgb(0,0,0)', // color to render background with
       transparent: useTransparency ? TRANSPARENCY_COLOR : null,
       dispose: 2,
     });
@@ -529,8 +530,10 @@ export default class FrameMaker {
     if (!animationEntry) {
       throw new Error(`No animation entry found with name ${animationName}`);
     } 
+
+    animationEntry.gif = animationEntry.gif || {};
     
-    if (!animationEntry.gif) {
+    if (!animationEntry.gif[backgroundColor]) {
       const numFrames = animationEntry.frames.length;
       for (let i = 0; i < numFrames; ++i) {
         const frame = await this.getFrame({
@@ -543,7 +546,9 @@ export default class FrameMaker {
           flipVertical,
           drawFrameBounds,
         });
-        this.createFilteredFrameByAlpha(frame);
+        if (!backgroundColor) {
+          this.createFilteredFrameByAlpha(frame);
+        }
         const delay = Math.floor(frame.dataset.delay / 60 * 1000);
         gif.addFrame(frame, { delay });
   
@@ -556,12 +561,12 @@ export default class FrameMaker {
         gif.render();
       });
 
-      animationEntry.gif = {
+      animationEntry.gif[backgroundColor] = {
         url: URL.createObjectURL(blob),
         blob: await this._blobToBase64(blob),
       };
     }
 
-    return animationEntry.gif;
+    return animationEntry.gif[backgroundColor];
   }
 }

@@ -12,7 +12,7 @@
         body {
             background: aliceblue;
         }
-    
+
         /* canvas {
             border: 1px solid black;
         } */
@@ -77,6 +77,10 @@
 
         .animation-options-container label input[type="checkbox"]+span {
             height: auto;
+        }
+
+        canvas#target {
+            margin: 0.5em;
         }
     </style>
 </head>
@@ -242,15 +246,50 @@
                 <div class="card-content">
                     <span class="card-title">Animation</span>
                     <span v-if="!animationReady">Generate an animation using the card above to be viewed here.</span>
+                    <div class="row" v-show="animationReady">
+                        <div class="col s12 m6">
+                            <section role="radiogroup" aria-labelledby="animationGroupLabel">
+                                <p id="animationGroupLabel">Active Animation</p>
+                                <label v-for="name in animationNames" :key="name" style="display: block;">
+                                    <input type="radio" name="animationName" v-model="activeAnimation" :value="name">
+                                    <span style="text-transform: capitalize;">{{ name }}</span>
+                                </label>
+                            </section>
+                        </div>
+                        <div class="col s12 m6">
+                            <section role="radiogroup" aria-labelledby="backgroundColorLabel">
+                                <p id="backgroundColorLabel">Background Color</p>
+                                <label v-for="entry in defaultColors" :key="entry.label" style="display: block;">
+                                    <input
+                                        v-model="activeBackgroundColor"
+                                        type="radio"
+                                        name="backgroundColor"
+                                        :value="entry.value">
+                                    <span>{{ entry.label }}</span>
+                                    <span
+                                        v-if="entry.value !== 'None' && entry.value !== 'Other'"
+                                        aria-hidden="true"
+                                        :style="generateColorPreviewStyles(entry.value)"
+                                    ></span>
+                                    <span v-if="entry.value === 'Other'">
+                                        <datalist id="backgroundColors">
+                                            <option>#FF0000</option>
+                                            <option>#00FF00</option>
+                                            <option>#0000FF</option>
+                                        </datalist>
+                                        <input
+                                            v-model="customBackgroundColor"
+                                            :disabled="activeBackgroundColor !== 'Other'"
+                                            type="color"
+                                            name="customBackgroundColor"
+                                            list="backgroundColors"
+                                        >
+                                    </span>
+                                </label>
+                            </section>
+                        </div>
+                    </div>
                     <div class="container" style="margin: 0; width: 100%; flex-direction: column;" v-show="animationReady">
-                        <section class="container" style="margin: 0; width: 100%;">
-                            <a  
-                                v-for="name in animationNames"
-                                :key="name"
-                                :class="{ 'btn black-text': true, 'blue lighten-4': activeAnimation === name, 'grey lighten-4': activeAnimation !== name }"
-                                v-text="name"
-                                @click="!isLoading && (activeAnimation = name);"></a>
-                        </section>
                         <section v-show="activeAnimation" style="display: flex; min-width: 100%; flex-direction: column; align-items: center; max-width: 100%;">
                             <canvas id="target" style="flex: none;"></canvas>
                             <div class="container" style="margin: 0; width: 100%; max-width: 100%; overflow-x: auto; align-items: center;">
@@ -276,11 +315,12 @@
                 <div
                     v-if="activeAnimation"
                     :class="{ 'card-action': true, 'green lighten-4': !isLoading && animationUrls[activeAnimation], 'grey lighten-3': isLoading }">
-                    <a v-if="!animationUrls[activeAnimation]" @click="generateGif(activeAnimation)" href="#progress" :class="{ 'blue-text text-darken-2': !isLoading, 'grey-text text-darken-2': isLoading }">
-                        Generate {{ activeAnimation }} Animation
+                    <a v-if="!animationUrls[activeAnimation] || (generatedColor !== activeBackgroundColor && generatedColor !== customBackgroundColor)" @click="generateGif(activeAnimation)" href="#progress" :class="{ 'blue-text text-darken-2': !isLoading, 'grey-text text-darken-2': isLoading }">
+                        Generate {{ activeAnimation }} GIF
                     </a>
-                    <a v-else :href="animationUrls[activeAnimation]" class="blue-text text-darken-2" target="_blank">
-                        Download {{ activeAnimation }} Animation
+                    <a v-if="animationUrls[activeAnimation] && !isLoading" :href="animationUrls[activeAnimation]"
+                        class="blue-text text-darken-2" target="_blank">
+                        Download {{ activeAnimation }} GIF
                     </a>
                 </div>
             </div>

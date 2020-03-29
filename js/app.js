@@ -11,7 +11,12 @@ window.FrameMaker = FrameMaker; // for desktop script
 export default class App {
   constructor () {
     this._frameMaker = null;
+
+    /**
+     * @type {HTMLCanvasElement}
+     */
     this._targetCanvas = null;
+
     this._spritesheets = [];
     this._currentAnimation = null;
     this._raf = null;
@@ -25,6 +30,17 @@ export default class App {
       doTrim: false,
       doFlipHorizontal: false,
       doFlipVertical: false,
+      activeBackgroundColor: 'None',
+      customBackgroundColor: '#000000',
+      generatedColor: '',
+      defaultColors: [
+        { label: 'None', value: 'None' },
+        { label: 'Black', value: '#000000' },
+        { label: 'White', value: '#FFFFFF' },
+        { label: 'Discord Chat Dark', value: '#2C2F33' },
+        { label: 'BF Wiki Table Background', value: '#FAFAFA' },
+        { label: 'Other', value: 'Other' }
+      ],
       formMessage: 'Input your options above then press "Generate" to start generating an animation.',
       errorOccurred: false,
       activeAnimation: '',
@@ -67,6 +83,12 @@ export default class App {
             this.renderFrame(-Infinity);
           }
         },
+        activeBackgroundColor: () => {
+          this.renderFrame(this._vueData.frameIndex, { noIncrement: true });
+        },
+        customBackgroundColor: () => {
+          this.renderFrame(this._vueData.frameIndex, { noIncrement: true });
+        },
         isPlaying: (newValue) => {
           if (this._raf) {
             cancelAnimationFrame(this._raf);
@@ -98,10 +120,19 @@ export default class App {
         renderFrame: (...args) => this.renderFrame(...args),
         generateGif: (...args) => this.generateGif(...args),
         animate: () => this.animate(),
+        generateColorPreviewStyles: (color) => `width: 2em; background: ${color}; height: 1em; border: 1px solid black; display: inline-block;`,
       },
     });
 
     this._targetCanvas = document.querySelector('canvas#target');
+  }
+
+  getBackgroundColor () {
+    let color = '';
+    if (this._vueData.activeBackgroundColor !== 'None') {
+      color = this._vueData.activeBackgroundColor !== 'Other' ? this._vueData.activeBackgroundColor : this._vueData.customBackgroundColor;
+    }
+    return color;
   }
 
   async init () {
@@ -251,7 +282,6 @@ export default class App {
       return;
     }
 
-    
     // notify that animations are finished
     this._vueData.animationReady = true;
     this._vueData.animationUrls = {};
@@ -289,6 +319,12 @@ export default class App {
     }
     const context = this._targetCanvas.getContext('2d');
     context.clearRect(0, 0, this._targetCanvas.width, this._targetCanvas.height);
+
+    const backgroundColor = this.getBackgroundColor();
+    if (backgroundColor) {
+      context.fillStyle = backgroundColor;
+      context.fillRect(0, 0, this._targetCanvas.width, this._targetCanvas.height);
+    }
     context.drawImage(frame, 0, 0);
 
     // mark center of canvas
@@ -298,8 +334,10 @@ export default class App {
     // context.ellipse(this._targetCanvas.width / 2, this._targetCanvas.height / 2, 3, 3, Math.PI / 2, 0, Math.PI * 2);
     // context.fill();
     // context.restore();
-  
-    this._vueData.frameIndex = (frameToRender + 1 < animation.frames.length && frameToRender >= 0) ? frameToRender + 1 : 0;
+
+    if (!options.noIncrement) {
+      this._vueData.frameIndex = (frameToRender + 1 < animation.frames.length && frameToRender >= 0) ? frameToRender + 1 : 0;
+    }
     return frame;
   }
 
@@ -311,6 +349,7 @@ export default class App {
     this._setProgress(Infinity, 0);
     await waitForIdleFrame();
     try {
+      const backgroundColor = this.getBackgroundColor();
       const result = await this._frameMaker.toGif({
         spritesheets: this._spritesheets,
         animationName,
@@ -319,8 +358,10 @@ export default class App {
           this._setLog(`Creating GIF [${(amt * 100).toFixed(2)}%]`);
           this._setProgress(undefined, Math.floor(amt * 100));
         },
+        backgroundColor,
       });
       this._vueData.animationUrls[animationName] = result.url;
+      this._vueData.generatedColor = backgroundColor || this._vueData.activeBackgroundColor;
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error(err);
