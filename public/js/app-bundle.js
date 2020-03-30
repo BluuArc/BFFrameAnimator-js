@@ -420,18 +420,51 @@ var App = (function () {
       });
       targetCanvas.getContext('2d').drawImage(frameCanvas, 0, 0);
     }
-    createFilteredFrameByAlpha (frame) {
+    hexToRgb (hexString = '') {
+      const nonHashString = hexString.startsWith('#') ? hexString.slice(1) : hexString;
+      const hexValue = parseInt(nonHashString, 16);
+      const HEX_MASK = 0xFF;
+      return {
+        red: (hexValue >> 16) & HEX_MASK,
+        green: (hexValue >> 8) & HEX_MASK,
+        blue: hexValue & HEX_MASK,
+      };
+    }
+    createFilteredFrameByAlpha (frame, { limitingAlpha = 100, backgroundColor } = {}) {
       const context = frame.getContext('2d');
       const imageData = context.getImageData(0, 0, frame.width, frame.height);
+      const newFrame = document.createElement('canvas');
+      newFrame.width = frame.width;
+      newFrame.height = frame.height;
+      const newFrameContext = newFrame.getContext('2d');
       const pixels = imageData.data;
       const pixelDataLength = pixels.length;
+      const rgbColor = this.hexToRgb(backgroundColor);
       for (let i = 0; i < pixelDataLength; i += 4) {
         const currentPixelAlpha = pixels[i + 3];
-        if (currentPixelAlpha < 100) {
-          pixels[i + 3] = 0;
+        if (currentPixelAlpha < limitingAlpha) {
+          if (!backgroundColor) {
+            pixels[i + 3] = 0;
+          } else {
+            pixels[i] = rgbColor.red;
+            pixels[i + 1] = rgbColor.green;
+            pixels[i + 2] = rgbColor.blue;
+            pixels[i + 3] = 255;
+          }
         }
       }
-      context.putImageData(imageData, 0, 0);
+      newFrameContext.putImageData(imageData, 0, 0);
+      return newFrame;
+    }
+    createFrameWithBackground(frame, backgroundColor) {
+      const newFrame = document.createElement('canvas');
+      newFrame.width = frame.width;
+      newFrame.height = frame.height;
+      const newFrameContext = newFrame.getContext('2d');
+      newFrameContext.fillStyle = backgroundColor;
+      newFrameContext.fillRect(0, 0, frame.width, frame.height);
+      newFrameContext.drawImage(frame, 0, 0);
+      return newFrame;
     }
     async toGif ({
       spritesheets = [],
@@ -444,6 +477,7 @@ var App = (function () {
       GifClass,
       useTransparency = true,
       onProgressUpdate,
+      backgroundColor,
     }) {
       const gif = new GifClass({
         workerScript: 'js/gif.worker.js',
@@ -457,10 +491,11 @@ var App = (function () {
       if (!animationEntry) {
         throw new Error(`No animation entry found with name ${animationName}`);
       }
-      if (!animationEntry.gif) {
+      animationEntry.gif = animationEntry.gif || {};
+      if (!animationEntry.gif[backgroundColor]) {
         const numFrames = animationEntry.frames.length;
         for (let i = 0; i < numFrames; ++i) {
-          const frame = await this.getFrame({
+          const originalFrame = await this.getFrame({
             spritesheets,
             animationName,
             animationIndex: i,
@@ -470,8 +505,13 @@ var App = (function () {
             flipVertical,
             drawFrameBounds,
           });
-          this.createFilteredFrameByAlpha(frame);
-          const delay = Math.floor(frame.dataset.delay / 60 * 1000);
+          let frame;
+          if (backgroundColor) {
+            frame = this.createFrameWithBackground(originalFrame, backgroundColor);
+          } else {
+            frame = this.createFilteredFrameByAlpha(originalFrame);
+          }
+          const delay = Math.floor(originalFrame.dataset.delay / 60 * 1000);
           gif.addFrame(frame, { delay });
         }
         const blob = await new Promise((fulfill) => {
@@ -481,12 +521,12 @@ var App = (function () {
           gif.on('finished', blob => fulfill(blob));
           gif.render();
         });
-        animationEntry.gif = {
+        animationEntry.gif[backgroundColor] = {
           url: URL.createObjectURL(blob),
           blob: await this._blobToBase64(blob),
         };
       }
-      return animationEntry.gif;
+      return animationEntry.gif[backgroundColor];
     }
   }
 
@@ -507,6 +547,17 @@ var App = (function () {
         doTrim: false,
         doFlipHorizontal: false,
         doFlipVertical: false,
+        activeBackgroundColor: 'None',
+        customBackgroundColor: '#000000',
+        generatedColor: '',
+        defaultColors: [
+          { label: 'None', value: 'None' },
+          { label: 'Black', value: '#000000' },
+          { label: 'White', value: '#FFFFFF' },
+          { label: 'Discord Chat Dark', value: '#36393f' },
+          { label: 'BF Wiki Table Background', value: '#FAFAFA' },
+          { label: 'Other', value: 'Other' }
+        ],
         formMessage: 'Input your options above then press "Generate" to start generating an animation.',
         errorOccurred: false,
         activeAnimation: '',
@@ -549,6 +600,12 @@ var App = (function () {
               this.renderFrame(-Infinity);
             }
           },
+          activeBackgroundColor: () => {
+            this.renderFrame(this._vueData.frameIndex, { noIncrement: true });
+          },
+          customBackgroundColor: () => {
+            this.renderFrame(this._vueData.frameIndex, { noIncrement: true });
+          },
           isPlaying: (newValue) => {
             if (this._raf) {
               cancelAnimationFrame(this._raf);
@@ -579,9 +636,17 @@ var App = (function () {
           renderFrame: (...args) => this.renderFrame(...args),
           generateGif: (...args) => this.generateGif(...args),
           animate: () => this.animate(),
+          generateColorPreviewStyles: (color) => `width: 2em; background: ${color}; height: 1em; border: 1px solid black; display: inline-block;`,
         },
       });
       this._targetCanvas = document.querySelector('canvas#target');
+    }
+    getBackgroundColor () {
+      let color = '';
+      if (this._vueData.activeBackgroundColor !== 'None') {
+        color = this._vueData.activeBackgroundColor !== 'Other' ? this._vueData.activeBackgroundColor : this._vueData.customBackgroundColor;
+      }
+      return color;
     }
     async init () {
       const targetCanvas = document.querySelector('canvas#target');
@@ -734,8 +799,15 @@ var App = (function () {
       }
       const context = this._targetCanvas.getContext('2d');
       context.clearRect(0, 0, this._targetCanvas.width, this._targetCanvas.height);
+      const backgroundColor = this.getBackgroundColor();
+      if (backgroundColor) {
+        context.fillStyle = backgroundColor;
+        context.fillRect(0, 0, this._targetCanvas.width, this._targetCanvas.height);
+      }
       context.drawImage(frame, 0, 0);
-      this._vueData.frameIndex = (frameToRender + 1 < animation.frames.length && frameToRender >= 0) ? frameToRender + 1 : 0;
+      if (!options.noIncrement) {
+        this._vueData.frameIndex = (frameToRender + 1 < animation.frames.length && frameToRender >= 0) ? frameToRender + 1 : 0;
+      }
       return frame;
     }
     async generateGif (animationName) {
@@ -745,6 +817,7 @@ var App = (function () {
       this._setProgress(Infinity, 0);
       await waitForIdleFrame();
       try {
+        const backgroundColor = this.getBackgroundColor();
         const result = await this._frameMaker.toGif({
           spritesheets: this._spritesheets,
           animationName,
@@ -753,8 +826,10 @@ var App = (function () {
             this._setLog(`Creating GIF [${(amt * 100).toFixed(2)}%]`);
             this._setProgress(undefined, Math.floor(amt * 100));
           },
+          backgroundColor,
         });
         this._vueData.animationUrls[animationName] = result.url;
+        this._vueData.generatedColor = backgroundColor || this._vueData.activeBackgroundColor;
       } catch (err) {
         console.error(err);
         this._vueData.errorOccurred = true;
