@@ -96,10 +96,10 @@ var App = (function () {
           return r.text();
         }).then(r => r.split('\n').map(line => line.split(',')));
     }
-    static async fromBraveFrontierUnit (id = '10011', server = 'gl', doTrim = false) {
+    static async fromBraveFrontierUnit (id = '10011', server = 'gl', doTrim = false, cdnVersion = '') {
       const serverUrls = {
         eu: 'http://static-bravefrontier.gumi-europe.net/content/',
-        gl: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/',
+        gl: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21900/content/',
         jp: 'http://cdn.android.brave.a-lim.jp/',
       };
       const filepaths = {
@@ -108,9 +108,11 @@ var App = (function () {
         anime: 'unit/img/'
       };
       const animationTypes = ['idle', 'atk', 'move', server === 'eu' && 'skill'].filter(v => v);
-      const baseUrl = serverUrls[server];
+      let baseUrl = serverUrls[server];
       if (!baseUrl) {
         throw new Error(`Unknown server [${server}]`);
+      } else if (server === 'gl' && cdnVersion) {
+        baseUrl = `https://dv5bk1m8igv7v.cloudfront.net/asset/${cdnVersion}/content/`;
       }
       const input = {
         anime: [
@@ -544,6 +546,7 @@ var App = (function () {
         animationReady: false,
         unitId: '',
         activeServer: 'gl',
+        cdnVersion: '',
         doTrim: false,
         doFlipHorizontal: false,
         doFlipVertical: false,
@@ -731,7 +734,7 @@ var App = (function () {
           this._frameMaker = maker;
           this._spritesheets = spritesheets.slice();
         } else {
-          const { maker, spritesheet } = await FrameMaker.fromBraveFrontierUnit(this._vueData.unitId, this._vueData.activeServer, this._vueData.doTrim);
+          const { maker, spritesheet } = await FrameMaker.fromBraveFrontierUnit(this._vueData.unitId, this._vueData.activeServer, this._vueData.doTrim, this._vueData.cdnVersion);
           this._frameMaker = maker;
           this._spritesheets = [spritesheet];
         }

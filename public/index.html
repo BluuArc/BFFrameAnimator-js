@@ -121,7 +121,7 @@
                             <section>
                                 <div style="flex: 1 0 auto;">
                                     <span>Unit ID</span>
-                                    <input type="text" v-model="unitId" id="unitId" class="browser-default" placeholder="BF Unit ID">
+                                    <input type="text" v-model="unitId" id="unitId" class="browser-default" placeholder="e.g. 10011">
                                 </div>
                             </section>
                             <section>
@@ -131,6 +131,13 @@
                                         <input name="server" type="radio" v-model="activeServer" :value="server">
                                         <span v-text="server.toUpperCase()"></span>
                                     </label>
+                                </div>
+                            </section>
+                            <section v-if="activeServer === 'gl'" style="margin-top: 1em">
+                                <div style="display: flex; flex: 1 1 auto;">
+                                    <span>CDN Version</span>
+                                    <input type="text" v-model="cdnVersion" id="unitId" class="browser-default"
+                                        placeholder="e.g. 21900">
                                 </div>
                             </section>
                         </template>

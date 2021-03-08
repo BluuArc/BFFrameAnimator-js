@@ -27,6 +27,7 @@ export default class App {
       animationReady: false,
       unitId: '',
       activeServer: 'gl',
+      cdnVersion: '',
       doTrim: false,
       doFlipHorizontal: false,
       doFlipVertical: false,
@@ -239,7 +240,7 @@ export default class App {
         this._frameMaker = maker;
         this._spritesheets = spritesheets.slice();
       } else {
-        const { maker, spritesheet } = await FrameMaker.fromBraveFrontierUnit(this._vueData.unitId, this._vueData.activeServer, this._vueData.doTrim);
+        const { maker, spritesheet } = await FrameMaker.fromBraveFrontierUnit(this._vueData.unitId, this._vueData.activeServer, this._vueData.doTrim, this._vueData.cdnVersion);
         this._frameMaker = maker;
         this._spritesheets = [spritesheet];
       }

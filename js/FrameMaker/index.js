@@ -87,10 +87,10 @@ export default class FrameMaker {
   }
 
   // very specific (but main use case) for the frame maker: animate Brave Frontier units
-  static async fromBraveFrontierUnit (id = '10011', server = 'gl', doTrim = false) {
+  static async fromBraveFrontierUnit (id = '10011', server = 'gl', doTrim = false, cdnVersion = '') {
     const serverUrls = {
       eu: 'http://static-bravefrontier.gumi-europe.net/content/',
-      gl: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21100/content/',
+      gl: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21900/content/',
       jp: 'http://cdn.android.brave.a-lim.jp/',
     };
     const filepaths = {
@@ -99,9 +99,11 @@ export default class FrameMaker {
       anime: 'unit/img/'
     };
     const animationTypes = ['idle', 'atk', 'move', server === 'eu' && 'skill'].filter(v => v);
-    const baseUrl = serverUrls[server];
+    let baseUrl = serverUrls[server];
     if (!baseUrl) {
       throw new Error(`Unknown server [${server}]`);
+    } else if (server === 'gl' && cdnVersion) {
+      baseUrl = `https://dv5bk1m8igv7v.cloudfront.net/asset/${cdnVersion}/content/`;
     }
 
     const input = {
