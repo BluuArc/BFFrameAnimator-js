@@ -38,7 +38,12 @@ function serverIsActive () {
 
 async function getPageInstance () {
   if (!browserInstance) {
-    browserInstance = await puppeteer.launch({ headless: !argv.notheadless });
+    let puppeteerArgs = { headless: !argv.notheadless };
+    if (!puppeteerArgs.headless) {
+      puppeteerArgs.args = ['--enable-gpu-rasterization', '--window-size=500,500'];
+      puppeteerArgs.defaultViewport = { width: 500, height: 500 };
+    }
+    browserInstance = await puppeteer.launch(puppeteerArgs);
   }
 
   if (!pageInstance) {
@@ -59,6 +64,8 @@ async function closeConnection () {
   return;
 }
 
+const getFileNameForUnitInfo = (unitInfo, cgsType) => `${unitInfo.type || 'unit'}_${unitInfo.id}_${cgsType}${unitInfo.backgroundColor ? `_bg-${unitInfo.backgroundColor}` : ''}.gif`;
+
 async function getAnimations (unitInfo) {
   const id = unitInfo.id;
   // eslint-disable-next-line no-console
@@ -69,7 +76,7 @@ async function getAnimations (unitInfo) {
   if (unitInfo.cgs) {
     let hasSkipped = false;
     for(const type in unitInfo.cgs) {
-      const filepath = `${argv.gifpath}/unit_${unitInfo.id}_${type}.gif`;
+      const filepath = `${argv.gifpath}/${getFileNameForUnitInfo(unitInfo, type)}`;
       if (fs.existsSync(filepath)) {
         log(`Skipping ${type} as ${filepath} already exists`);
         delete unitInfo.cgs[type];
@@ -114,6 +121,7 @@ async function getAnimations (unitInfo) {
     for (const name of animationNames) {
       const animation = frameMaker.getAnimation(name);
       const numFrames = animation.frames.length;
+      console.log(`rendering ${numFrames} frames for ${name}`);
       for (let i = 0; i < numFrames; ++i) {
         // await this._waitForIdleFrame();
         await frameMaker.getFrame({
@@ -144,17 +152,19 @@ async function getAnimations (unitInfo) {
   console.time('GIF creation time');
   log('Generating GIFs', types);
   const gifPromises = types.map(async type => {
-    const result = await page.evaluate(async (pageType) => {
+    const result = await page.evaluate(async ([pageType, backgroundColor]) => {
       /* global GIF app */
       const gif = await app.frameMaker.toGif({
         animationName: pageType,
         GifClass: GIF,
+        backgroundColor,
+        useTransparency: !backgroundColor
       });
       console.log('finished generating gif', gif, pageType);
       return gif;
-    }, type);
+    }, [type, unitInfo.backgroundColor]);
     
-    const path = `${argv.gifpath}/${unitInfo.type || 'unit'}_${unitInfo.id}_${type}.gif`;
+    const path = `${argv.gifpath}/${getFileNameForUnitInfo(unitInfo, type)}`;
     log('Saving GIF', path);
     return base64BlobToGIF(result.blob, path);
   });

@@ -830,6 +830,7 @@ var App = (function () {
             this._setProgress(undefined, Math.floor(amt * 100));
           },
           backgroundColor,
+          useTransparency: !backgroundColor
         });
         this._vueData.animationUrls[animationName] = result.url;
         this._vueData.generatedColor = backgroundColor || this._vueData.activeBackgroundColor;
