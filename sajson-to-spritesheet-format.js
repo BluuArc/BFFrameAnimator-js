@@ -70,7 +70,7 @@ function main() {
 				frameIndex: i,
 				xOffset: 0,
 				yOffset: 0,
-				frameDelay: 1
+				frameDelay: 60/json.mAnimRate
 			});
 		}
 	})
