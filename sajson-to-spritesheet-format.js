@@ -16,6 +16,16 @@ function main() {
 	if (!saJsonFilePath) {
 		throw new Error('No file passed in. Expected: "node <script-name> <path-to-SAJSON-file>');
 	}
+	/**
+	 * @type {string}
+	 */
+	let targetDirectory;
+	const saJsonFilePathPathInfo = path.parse(saJsonFilePath);
+	if (saJsonFilePathPathInfo.dir) {
+		targetDirectory = saJsonFilePathPathInfo.dir;
+	} else {
+		targetDirectory = '.'; // default to current script directory
+	}
 
 	/**
 	 * @type {import("./unit_anime_850198.json")}
@@ -97,12 +107,13 @@ function main() {
 			partsAsRow
 		].join(',');
 	}).join('\n');
-	saveFile(cggFileName, cggRows, { encoding: 'utf-8' });
+	saveFile(path.join(targetDirectory, cggFileName), cggRows, { encoding: 'utf-8' });
 
 	const animationEntry = {
 		id: fileNameWithoutExtension,
+		sam: `SAM_IMAGE_PATH/${fileNameWithoutExtension}.sam`,
 		anime: json.mImageVector.map((imageEntry) => `SAM_IMAGE_PATH/${imageEntry.mImageName}`),
-		cgg: `CSV_PATH/${cggFileName}`,
+		cgg: `SAJSON_PATH/${cggFileName}`,
 		cgs: {}
 	};
 
@@ -114,11 +125,11 @@ function main() {
 			e.yOffset,
 			e.frameDelay
 		].join(',')).join('\n');
-		animationEntry.cgs[animationName] = `CSV_PATH/${cgsFileName}`;
-		saveFile(cgsFileName, cgsRows, { encoding: 'utf-8' });
+		animationEntry.cgs[animationName] = `SAJSON_PATH/${cgsFileName}`;
+		saveFile(path.join(targetDirectory, cgsFileName), cgsRows, { encoding: 'utf-8' });
 	});
 
-	saveFile(`${fileNameWithoutExtension}_animation.json`, JSON.stringify(animationEntry, null, '\t'), { encoding: 'utf-8' });
+	saveFile(path.join(targetDirectory, `${fileNameWithoutExtension}_animation.json`), JSON.stringify(animationEntry, null, '\t'), { encoding: 'utf-8' });
 }
 
 main();
