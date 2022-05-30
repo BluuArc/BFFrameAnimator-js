@@ -102,6 +102,16 @@ async function getAnimations (unitInfo) {
   console.time('render time');
   log('Generating frames for', unitInfo.id);
   const types = await page.evaluate(async (pageUnitInfo) => {
+    let errorArgs;
+    const originalConsoleError = window.console.error;
+    const handleError = function(...args) {
+      originalConsoleError.apply(this, args);
+      errorArgs = args;
+      throw new Error(...args);
+    };
+    window.console.error = handleError;
+    window.addEventListener('error', handleError);
+
     window.requestIdleCallback = (fn) => window.setTimeout(() => fn(), 0);
     /* global FrameMaker */
     let frameMaker, spriteSheets;
@@ -116,21 +126,27 @@ async function getAnimations (unitInfo) {
     }
 
     app._frameMaker = frameMaker;
+    app._spritesheets = spriteSheets;
 
     const animationNames = frameMaker.loadedAnimations;
-    for (const name of animationNames) {
-      const animation = frameMaker.getAnimation(name);
-      const numFrames = animation.frames.length;
-      console.log(`rendering ${numFrames} frames for ${name}`);
-      for (let i = 0; i < numFrames; ++i) {
-        // await this._waitForIdleFrame();
-        await frameMaker.getFrame({
-          spritesheets: spriteSheets,
-          animationName: name,
-          animationIndex: i,
-        });
-      }
+    window.console.error = originalConsoleError;
+    window.removeEventListener('error', handleError);
+    if (errorArgs) {
+      throw new Error(...errorArgs);
     }
+    // for (const name of animationNames) {
+    //   const animation = frameMaker.getAnimation(name);
+    //   const numFrames = animation.frames.length;
+    //   console.log(`rendering ${numFrames} frames for ${name}`);
+    //   for (let i = 0; i < numFrames; ++i) {
+    //     // await this._waitForIdleFrame();
+    //     await frameMaker.getFrame({
+    //       spritesheets: spriteSheets,
+    //       animationName: name,
+    //       animationIndex: i,
+    //     });
+    //   }
+    // }
     return animationNames;
     // myApp.setUnitInfo(null);
     // myApp.setBasicInfo(null);
@@ -153,13 +169,30 @@ async function getAnimations (unitInfo) {
   log('Generating GIFs', types);
   const gifPromises = types.map(async type => {
     const result = await page.evaluate(async ([pageType, backgroundColor]) => {
+      let errorArgs;
+      const originalConsoleError = window.console.error;
+      const handleError = function(...args) {
+        originalConsoleError.apply(this, args);
+        errorArgs = args;
+        throw new Error(...args);
+      };
+      window.console.error = handleError;
+      window.addEventListener('error', handleError);
       /* global GIF app */
+      console.log('generating gif', pageType, backgroundColor);
       const gif = await app.frameMaker.toGif({
+        spritesheets: app._spritesheets,
         animationName: pageType,
         GifClass: GIF,
         backgroundColor,
-        useTransparency: !backgroundColor
+        useTransparency: !backgroundColor,
+        cacheNewCanvases: false,
       });
+      window.console.error = originalConsoleError;
+      window.removeEventListener('error', handleError);
+      if (errorArgs) {
+        throw new Error(...errorArgs);
+      }
       console.log('finished generating gif', gif, pageType);
       return gif;
     }, [type, unitInfo.backgroundColor]);
@@ -176,7 +209,7 @@ async function getAnimations (unitInfo) {
   count++;
 
   // reset the browser every so often to avoid hangups
-  if (count > 5) {
+  if (count > 1) {
     await closeConnection();
     count = 0;
   }

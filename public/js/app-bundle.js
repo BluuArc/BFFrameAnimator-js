@@ -57,8 +57,8 @@ var App = (function () {
   });
   const TRANSPARENCY_COLOR = 'rgb(100, 100, 100)';
   class FrameMaker {
-    constructor (cggCsv = []) {
-      this._frames = this._processCgg(cggCsv);
+    constructor (cggCsv = [], scalingInformationByFrameByPart = {}) {
+      this._frames = this._processCgg(cggCsv, scalingInformationByFrameByPart);
       this._animations = {};
     }
     _blobToBase64 (blob) {
@@ -150,7 +150,7 @@ var App = (function () {
           });
       });
       const maker = await FrameMaker._loadCsv(`/get/${encodeURIComponent(input.cgg)}`)
-        .then(csv => new FrameMaker(csv));
+        .then(csv => new FrameMaker(csv, input.scalingInformationByFrameByPart));
       await Promise.all(cgsPromises);
       for (const key in cgsCsv) {
         await maker.addAnimation(key, cgsCsv[key], doTrim);
@@ -160,7 +160,7 @@ var App = (function () {
         spritesheets,
       }));
     }
-    _cggLineToEntry (frameLine = [], index = -1) {
+    _cggLineToEntry (frameLine = [], index = -1, scalingInformationByFrameByPart = {}) {
       const entry = {
         anchorType: +frameLine[0],
         partCount: +frameLine[1],
@@ -193,6 +193,10 @@ var App = (function () {
           },
           pageId: +frameLine[curIndex++],
         };
+        const scalingInfoKey = `${index}-${partCount}`;
+        if (scalingInformationByFrameByPart[scalingInfoKey]) {
+          Object.assign(part, scalingInformationByFrameByPart[scalingInfoKey]);
+        }
         if (partIsValid(part)) {
           partCount++;
           entry.parts.push(part);
@@ -202,10 +206,10 @@ var App = (function () {
       }
       return entry;
     }
-    _processCgg (cggCsv = []) {
+    _processCgg (cggCsv = [], scalingInformationByFrameByPart) {
       return cggCsv
         .filter(frame => frame.length >= 2)
-        .map((frame, i) => this._cggLineToEntry(frame, i));
+        .map((frame, i) => this._cggLineToEntry(frame, i, scalingInformationByFrameByPart));
     }
     _processCgs (cgsCsv = []) {
       return cgsCsv.map(frame => ({
@@ -269,6 +273,7 @@ var App = (function () {
       flipHorizontal = false,
       flipVertical = false,
       drawFrameBounds = false,
+      cacheNewCanvases = true,
     }) {
       const animationEntry = this._animations[animationName];
       if (!animationEntry) {
@@ -310,22 +315,35 @@ var App = (function () {
           const flipY = part.flipType === 2 || part.flipType === 3;
           let tempX = tempCanvas.width / 2 - sourceWidth / 2,
             tempY = tempCanvas.height / 2 - sourceHeight / 2;
-          if (flipX || flipY) {
-            tempContext.save();
-            tempContext.translate(flipX ? sourceWidth : 0, flipY ? sourceHeight : 0);
-            tempContext.scale(flipX ? -1 : 1, flipY ? -1 : 1);
-            tempX -= (flipX ? tempCanvas.width - sourceWidth : 0);
-            tempY -= (flipY ? tempCanvas.height - sourceHeight : 0);
+          const hasImageScaling = 'imageScaleX' in part || 'imageScaleY' in part;
+          const xImageScaling = hasImageScaling ? part.imageScaleX : 1;
+          const yImageScaling = hasImageScaling ? part.imageScaleY : 1;
+          tempContext.save();
+          if (hasImageScaling) {
+            tempContext.translate(tempX, tempY);
+            tempContext.drawImage(
+              spritesheets[part.pageId],
+              part.img.x, part.img.y, sourceWidth, sourceHeight,
+              0, 0,
+              sourceWidth, sourceHeight,
+            );
+          } else {
+            if (flipX || flipY) {
+              tempContext.translate(flipX ? sourceWidth : 0, flipY ? sourceHeight : 0);
+              tempContext.scale(flipX ? -xImageScaling : xImageScaling, flipY ? -yImageScaling : yImageScaling);
+              tempX -= (flipX ? tempCanvas.width - sourceWidth : 0);
+              tempY -= (flipY ? tempCanvas.height - sourceHeight : 0);
+            } else {
+              tempContext.scale(xImageScaling, yImageScaling);
+            }
+            tempContext.drawImage(
+              spritesheets[part.pageId],
+              part.img.x, part.img.y, sourceWidth, sourceHeight,
+              tempX, tempY,
+              sourceWidth, sourceHeight,
+            );
           }
-          tempContext.drawImage(
-            spritesheets[part.pageId],
-            part.img.x, part.img.y, sourceWidth, sourceHeight,
-            tempX, tempY,
-            sourceWidth, sourceHeight,
-          );
-          if (flipX || flipY) {
-            tempContext.restore();
-          }
+          tempContext.restore();
           if (part.blendMode === 1) {
             const imgData = tempContext.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
             const pixelData = imgData.data;
@@ -350,15 +368,34 @@ var App = (function () {
             frameContext.rotate(-part.rotate * Math.PI / 180);
             frameContext.translate(-(origin.x + part.position.x + sourceWidth / 2 + bounds.offset.left), -(origin.y + part.position.y + sourceHeight / 2 + bounds.offset.top));
           }
-          frameContext.drawImage(
-            tempCanvas,
-            0, 0,
-            tempCanvas.width, tempCanvas.height,
-            targetX + bounds.offset.left, targetY + bounds.offset.top,
-            tempCanvas.width, tempCanvas.height,
-          );
-          if (part.rotate !== 0) {
+          const hasFrameScaling = 'frameScaleX' in part || 'frameScaleY' in part;
+          if (hasFrameScaling) {
+            if (part.rotate === 0) {
+              frameContext.save();
+            }
+            const xOffset = hasFrameScaling ? tempCanvas.width / 2 * (1 - part.frameScaleX) : 0;
+            const yOffset = hasFrameScaling ? tempCanvas.height / 2 * (1 - part.frameScaleY) : 0;
+            frameContext.translate(targetX + bounds.offset.left + xOffset, targetY + bounds.offset.top + yOffset);
+            frameContext.scale(part.frameScaleX, part.frameScaleY);
+            frameContext.drawImage(
+              tempCanvas,
+              0, 0,
+              tempCanvas.width, tempCanvas.height,
+              0, 0,
+              tempCanvas.width, tempCanvas.height,
+            );
             frameContext.restore();
+          } else {
+            frameContext.drawImage(
+              tempCanvas,
+              0, 0,
+              tempCanvas.width, tempCanvas.height,
+              targetX + bounds.offset.left, targetY + bounds.offset.top,
+              tempCanvas.width, tempCanvas.height,
+            );
+            if (part.rotate !== 0) {
+              frameContext.restore();
+            }
           }
         } catch (err) {
           console.warn('skipping part due to error', partIndex, part);
@@ -375,6 +412,7 @@ var App = (function () {
         flippedContext.drawImage(frameCanvas, 0, 0);
         frameContext.clearRect(0, 0, frameCanvas.width, frameCanvas.height);
         frameContext.drawImage(flippedCanvas, 0, 0);
+        flippedCanvas.remove();
       }
       if (drawFrameBounds) {
         console.debug('drawing frame bounds', bounds, origin);
@@ -397,7 +435,9 @@ var App = (function () {
         frameContext.stroke();
         frameContext.restore();
       }
-      cachedCanvases[animationIndex] = frameCanvas;
+      if (cacheNewCanvases) {
+        cachedCanvases[animationIndex] = frameCanvas;
+      }
       tempCanvas.remove();
       return frameCanvas;
     }
@@ -478,6 +518,7 @@ var App = (function () {
       drawFrameBounds = false,
       GifClass,
       useTransparency = true,
+      cacheNewCanvases = true,
       onProgressUpdate,
       backgroundColor,
     }) {
@@ -506,6 +547,7 @@ var App = (function () {
             flipHorizontal,
             flipVertical,
             drawFrameBounds,
+            cacheNewCanvases,
           });
           let frame;
           if (backgroundColor) {
@@ -830,7 +872,7 @@ var App = (function () {
             this._setProgress(undefined, Math.floor(amt * 100));
           },
           backgroundColor,
-          useTransparency: !backgroundColor
+          useTransparency: !backgroundColor,
         });
         this._vueData.animationUrls[animationName] = result.url;
         this._vueData.generatedColor = backgroundColor || this._vueData.activeBackgroundColor;

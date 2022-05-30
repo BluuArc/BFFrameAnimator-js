@@ -43,8 +43,8 @@ const calculateAnimationBounds = greenlet(function (cgsEntry = [], frames = [], 
 const TRANSPARENCY_COLOR = 'rgb(100, 100, 100)';
 
 export default class FrameMaker {
-  constructor (cggCsv = []) {
-    this._frames = this._processCgg(cggCsv);
+  constructor (cggCsv = [], scalingInformationByFrameByPart = {}) {
+    this._frames = this._processCgg(cggCsv, scalingInformationByFrameByPart);
     this._animations = {};
   }
 
@@ -149,7 +149,7 @@ export default class FrameMaker {
     });
 
     const maker = await FrameMaker._loadCsv(`/get/${encodeURIComponent(input.cgg)}`)
-      .then(csv => new FrameMaker(csv));
+      .then(csv => new FrameMaker(csv, input.scalingInformationByFrameByPart));
 
     // add found cgs animations to maker
     await Promise.all(cgsPromises);
@@ -164,7 +164,7 @@ export default class FrameMaker {
     }));
   }
 
-  _cggLineToEntry (frameLine = [], index = -1) {
+  _cggLineToEntry (frameLine = [], index = -1, scalingInformationByFrameByPart = {}) {
     const entry = {
       anchorType: +frameLine[0],
       partCount: +frameLine[1],
@@ -200,6 +200,10 @@ export default class FrameMaker {
         },
         pageId: +frameLine[curIndex++],
       };
+      const scalingInfoKey = `${index}-${partCount}`;
+      if (scalingInformationByFrameByPart[scalingInfoKey]) {
+        Object.assign(part, scalingInformationByFrameByPart[scalingInfoKey]);
+      }
       if (partIsValid(part)) {
         partCount++;
         entry.parts.push(part);
@@ -210,10 +214,10 @@ export default class FrameMaker {
     return entry;
   }
 
-  _processCgg (cggCsv = []) {
+  _processCgg (cggCsv = [], scalingInformationByFrameByPart) {
     return cggCsv
       .filter(frame => frame.length >= 2) // filter out empty frames
-      .map((frame, i) => this._cggLineToEntry(frame, i));
+      .map((frame, i) => this._cggLineToEntry(frame, i, scalingInformationByFrameByPart));
   }
 
   _processCgs (cgsCsv = []) {
@@ -289,6 +293,7 @@ export default class FrameMaker {
     flipHorizontal = false,
     flipVertical = false,
     drawFrameBounds = false,
+    cacheNewCanvases = true,
   }) {
     const animationEntry = this._animations[animationName];
     if (!animationEntry) {
@@ -337,30 +342,43 @@ export default class FrameMaker {
         tempContext.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
         tempContext.globalAlpha = part.opacity / 100;
 
-
         const flipX = part.flipType === 1 || part.flipType === 3;
         const flipY = part.flipType === 2 || part.flipType === 3;
 
         // draw part onto center of part canvas
         let tempX = tempCanvas.width / 2 - sourceWidth / 2,
           tempY = tempCanvas.height / 2 - sourceHeight / 2;
-        if (flipX || flipY) {
-          tempContext.save();
-          tempContext.translate(flipX ? sourceWidth : 0, flipY ? sourceHeight : 0);
-          tempContext.scale(flipX ? -1 : 1, flipY ? -1 : 1);
-          tempX -= (flipX ? tempCanvas.width - sourceWidth : 0);
-          tempY -= (flipY ? tempCanvas.height - sourceHeight : 0);
+        const hasImageScaling = 'imageScaleX' in part || 'imageScaleY' in part;
+        const xImageScaling = hasImageScaling ? part.imageScaleX : 1;
+        const yImageScaling = hasImageScaling ? part.imageScaleY : 1;
+        tempContext.save();
+        if (hasImageScaling) {
+          // assumption: if image scaling is present, then no flipping is present
+          tempContext.translate(tempX, tempY);
+          tempContext.drawImage(
+            spritesheets[part.pageId],
+            part.img.x, part.img.y, sourceWidth, sourceHeight,
+            0, 0,
+            sourceWidth, sourceHeight,
+          );
+        } else {
+          if (flipX || flipY) {
+            tempContext.translate(flipX ? sourceWidth : 0, flipY ? sourceHeight : 0);
+            tempContext.scale(flipX ? -xImageScaling : xImageScaling, flipY ? -yImageScaling : yImageScaling);
+            tempX -= (flipX ? tempCanvas.width - sourceWidth : 0);
+            tempY -= (flipY ? tempCanvas.height - sourceHeight : 0);
+          } else {
+            tempContext.scale(xImageScaling, yImageScaling);
+          }
+          // from spritesheet to part canvas
+          tempContext.drawImage(
+            spritesheets[part.pageId],
+            part.img.x, part.img.y, sourceWidth, sourceHeight,
+            tempX, tempY,
+            sourceWidth, sourceHeight,
+          );
         }
-        // from spritesheet to part canvas
-        tempContext.drawImage(
-          spritesheets[part.pageId],
-          part.img.x, part.img.y, sourceWidth, sourceHeight,
-          tempX, tempY,
-          sourceWidth, sourceHeight,
-        );
-        if (flipX || flipY) {
-          tempContext.restore();
-        }
+        tempContext.restore();
 
         // blend code based off of this: http://pastebin.com/vXc0yNRh
         if (part.blendMode === 1) {
@@ -410,15 +428,34 @@ export default class FrameMaker {
           frameContext.rotate(-part.rotate * Math.PI / 180);
           frameContext.translate(-(origin.x + part.position.x + sourceWidth / 2 + bounds.offset.left), -(origin.y + part.position.y + sourceHeight / 2 + bounds.offset.top));
         }
-        frameContext.drawImage(
-          tempCanvas,
-          0, 0, // start at top left of temp canvas
-          tempCanvas.width, tempCanvas.height,
-          targetX + bounds.offset.left, targetY + bounds.offset.top,
-          tempCanvas.width, tempCanvas.height,
-        );
-        if (part.rotate !== 0) {
+        const hasFrameScaling = 'frameScaleX' in part || 'frameScaleY' in part;
+        if (hasFrameScaling) {
+          if (part.rotate === 0) {
+            frameContext.save();
+          }
+          const xOffset = hasFrameScaling ? tempCanvas.width / 2 * (1 - part.frameScaleX) : 0;
+          const yOffset = hasFrameScaling ? tempCanvas.height / 2 * (1 - part.frameScaleY) : 0;
+          frameContext.translate(targetX + bounds.offset.left + xOffset, targetY + bounds.offset.top + yOffset);
+          frameContext.scale(part.frameScaleX, part.frameScaleY);
+          frameContext.drawImage(
+            tempCanvas,
+            0, 0, // start at top left of temp canvas
+            tempCanvas.width, tempCanvas.height,
+            0, 0,
+            tempCanvas.width, tempCanvas.height,
+          );
           frameContext.restore();
+        } else {
+          frameContext.drawImage(
+            tempCanvas,
+            0, 0, // start at top left of temp canvas
+            tempCanvas.width, tempCanvas.height,
+            targetX + bounds.offset.left, targetY + bounds.offset.top,
+            tempCanvas.width, tempCanvas.height,
+          );
+          if (part.rotate !== 0) {
+            frameContext.restore();
+          }
         }
       } catch (err) {
         /* eslint-disable no-console */
@@ -438,6 +475,7 @@ export default class FrameMaker {
       flippedContext.drawImage(frameCanvas, 0, 0);
       frameContext.clearRect(0, 0, frameCanvas.width, frameCanvas.height);
       frameContext.drawImage(flippedCanvas, 0, 0);
+      flippedCanvas.remove();
     }
     if (drawFrameBounds) {
       console.debug('drawing frame bounds', bounds, origin);
@@ -460,7 +498,9 @@ export default class FrameMaker {
       frameContext.stroke();
       frameContext.restore();
     }
-    cachedCanvases[animationIndex] = frameCanvas;
+    if (cacheNewCanvases) {
+      cachedCanvases[animationIndex] = frameCanvas;
+    }
     tempCanvas.remove();
     // console.debug(bounds, frameCanvas);
     return frameCanvas;
@@ -557,6 +597,7 @@ export default class FrameMaker {
     drawFrameBounds = false,
     GifClass,
     useTransparency = true,
+    cacheNewCanvases = true,
     onProgressUpdate,
     backgroundColor,
   }) {
@@ -588,6 +629,7 @@ export default class FrameMaker {
           flipHorizontal,
           flipVertical,
           drawFrameBounds,
+          cacheNewCanvases,
         });
 
         let frame;
