@@ -3,8 +3,9 @@ const express = require('express'),
   app = express();
 const rp = require('request-promise');
 const request = require('request').defaults({ encoding: null });
+const argv = require('./get-cli-arguments');
 
-app.set('port', (process.env.PORT || 5000));
+app.set('port', (process.env.PORT || argv.port || 5000));
 app.use(express.static('public'));
 
 app.use(function (req, res, next) {
