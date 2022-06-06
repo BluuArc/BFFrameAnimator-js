@@ -38,12 +38,38 @@ function main() {
 		throw new Error(`Error reading path [${saJsonFilePath}]`);
 	}
 
-	const cggFrames = json.mFrames.map((frameEntry) => {
-		const parts = frameEntry.mObjectVector.map((partEntry) => {
+	const fileNameWithoutExtension = path.basename(saJsonFilePath, path.extname(saJsonFilePath));
+	const cggFileName = `${fileNameWithoutExtension}_cgg.csv`;
+	const animationEntry = {
+		id: fileNameWithoutExtension,
+		sam: `SAM_IMAGE_PATH/${fileNameWithoutExtension}.sam`,
+		anime: json.mImageVector.map((imageEntry) => `SAM_IMAGE_PATH/${imageEntry.mImageName}`),
+		cgg: `SAJSON_PATH/${cggFileName}`,
+		cgs: {},
+		scalingInformationByFrameByPart: {},
+	};
+
+	const cggFrames = json.mFrames.map((frameEntry, frameIndex) => {
+		const parts = frameEntry.mObjectVector.map((partEntry, partIndex) => {
 			const imageEntry = json.mImageVector[partEntry.mResNum];
 
 			const frameMatrix = partEntry.mTransform.mMatrix.m;
 			const imageMatrix = imageEntry.mTransform.mMatrix.m;
+
+			const [frameScaleX, frameScaleY] = [frameMatrix[0][0], frameMatrix[1][1]];
+			const [imageScaleX, imageScaleY] = [imageMatrix[0][0], imageMatrix[1][1]];
+			const scaleX = imageScaleX * frameScaleX;
+			const scaleY = imageScaleY * frameScaleY;
+			if (scaleX !== 1 || scaleY !== 1) {
+				const scalingInfoKey = `${frameIndex}-${frameEntry.mObjectVector.length - partIndex}`; // offset to account for reversed parts
+				const scaleInfoForPart = animationEntry.scalingInformationByFrameByPart[scalingInfoKey] = {};
+				scaleInfoForPart.scaleX = scaleX;
+				scaleInfoForPart.scaleY = scaleY;
+				scaleInfoForPart.frameScaleX = frameScaleX;
+				scaleInfoForPart.frameScaleY = frameScaleY;
+				scaleInfoForPart.imageScaleX = imageScaleX;
+				scaleInfoForPart.imageScaleY = imageScaleY;
+			}
 			return {
 				xPositionRelativeToCenterForFrameInPx: frameMatrix[0][2] + imageMatrix[0][2],
 				yPositionRelativeToCenterForFrameInPx: frameMatrix[1][2] + imageMatrix[1][2],
@@ -57,7 +83,7 @@ function main() {
 				heightOfSelectionFromSpritesheetInPx: imageEntry.mHeight,
 				spritesheetIndex: partEntry.mResNum
 			};
-		});
+		}).reverse();
 
 		return {
 			anchorType: 0,
@@ -85,8 +111,6 @@ function main() {
 		}
 	})
 
-	const fileNameWithoutExtension = path.basename(saJsonFilePath, path.extname(saJsonFilePath));
-	const cggFileName = `${fileNameWithoutExtension}_cgg.csv`;
 	const cggRows = cggFrames.map((frameEntry) => {
 		const partsAsRow = frameEntry.parts.map((part) => [
 			part.xPositionRelativeToCenterForFrameInPx,
@@ -108,14 +132,6 @@ function main() {
 		].join(',');
 	}).join('\n');
 	saveFile(path.join(targetDirectory, cggFileName), cggRows, { encoding: 'utf-8' });
-
-	const animationEntry = {
-		id: fileNameWithoutExtension,
-		sam: `SAM_IMAGE_PATH/${fileNameWithoutExtension}.sam`,
-		anime: json.mImageVector.map((imageEntry) => `SAM_IMAGE_PATH/${imageEntry.mImageName}`),
-		cgg: `SAJSON_PATH/${cggFileName}`,
-		cgs: {}
-	};
 
 	Object.entries(cgsFrames).forEach(([animationName, cgsEntry]) => {
 		const cgsFileName = `${fileNameWithoutExtension}_${animationName}_cgs.csv`;
