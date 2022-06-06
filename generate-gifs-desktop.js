@@ -62,8 +62,8 @@ async function closeConnection () {
     await browserInstance.close();
     pageInstance = null;
     browserInstance = null;
-    // wait 5s for browser to fully clear itself from memory?
-    await new Promise((resolve) => { setTimeout(() => resolve(), 5_000); });
+    // wait 1s for browser to fully clear itself from memory?
+    await new Promise((resolve) => { setTimeout(() => resolve(), 1_000); });
   }
   return;
 }
@@ -211,7 +211,7 @@ function initializePageInstanceWithUnitInfo(pageInstance, unitInfo) {
 /**
  * @param {AnimationMetadata} metadata
  */
- async function generateGifThroughFfmpeg(metadata, unitInfo) {
+ async function generateAnimationThroughFfmpeg(metadata, unitInfo, { renderGif = true } = {}) {
   console.log(`[${unitInfo.id}] Using ffmpeg`);
   const intermediateFiles = [];
   const warnings = [];
@@ -428,19 +428,21 @@ function initializePageInstanceWithUnitInfo(pageInstance, unitInfo) {
   const frameFileNameFormatWithPath = path.join(normalizedTempFolder, fileNameFormat);
   const gifPath = path.join(path.normalize(argv.gifpath), getFileNameForUnitInfo(unitInfo, metadata.name));
   const ffmpegPath = path.normalize(argv.absolutepathtoffmpeg);
-  console.log(`[${unitInfo.id}] Saving GIF`, gifPath);
-  await runCommand([
-    ffmpegPath,
-    `-i ${frameFileNameFormatWithPath}`,
-    unitInfo.backgroundColor ? '-gifflags 0' : '-gifflags 2',
-    `-filter_complex`,
-    [
-      `[0:v]\\ fps=${metadata.frameRate},split\\ [a][b];`,
-      `[a]\\ palettegen${unitInfo.backgroundColor ? '' : `=stats_mode=single`}\\ [p];`,
-      `[b][p]\\ paletteuse${unitInfo.backgroundColor ? '=alpha_threshold=0': `=dither=floyd_steinberg:alpha_threshold=100:new=1`}`,
-    ].join(''),
-    gifPath,
-  ].join(' '));
+  console.log(`[${unitInfo.id}] Saving animation`, gifPath);
+  if (renderGif) {
+    await runCommand([
+      ffmpegPath,
+      `-i ${frameFileNameFormatWithPath}`,
+      unitInfo.backgroundColor ? '-gifflags 0' : '-gifflags 2',
+      `-filter_complex`,
+      [
+        `[0:v]\\ fps=${metadata.frameRate},split\\ [a][b];`,
+        `[a]\\ palettegen${unitInfo.backgroundColor ? '' : `=stats_mode=single`}\\ [p];`,
+        `[b][p]\\ paletteuse${unitInfo.backgroundColor ? '=alpha_threshold=0': `=dither=floyd_steinberg:alpha_threshold=100:new=1`}`,
+      ].join(''),
+      gifPath,
+    ].join(' '));
+  }
 
   if (!unitInfo.backgroundColor) {
     await runCommand([
@@ -564,13 +566,22 @@ async function getAnimations (unitInfo) {
       const pageInstance = await getPageInstance();
       const warningsForAnimation = await (!useFfmpeg
         ? generateGifThroughPage(animationMetadata, unitInfo, pageInstance)
-        : generateGifThroughFfmpeg(animationMetadata, unitInfo, pageInstance)
+        : generateAnimationThroughFfmpeg(animationMetadata, unitInfo)
       );
       if (warningsForAnimation.length > 0) {
         warnings.push({
           animationMetadata,
           warnings: warningsForAnimation,
         });
+      }
+      if (!useFfmpeg && unitInfo.outputApng && !unitInfo.backgroundColor) {
+        const warningsForAnimationApng = await generateAnimationThroughFfmpeg(animationMetadata, unitInfo, { renderGif: false });
+        if (warningsForAnimationApng.length > 0) {
+          warnings.push({
+            animationMetadata,
+            warnings: warningsForAnimationApng,
+          });
+        }
       }
     });
   }, Promise.resolve());
