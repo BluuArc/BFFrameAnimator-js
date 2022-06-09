@@ -56,7 +56,7 @@ var App = (function () {
       top = -(yMax + yMin) / 2;
     }
     const hasPotentiallyBrokenScaling = width > CANVAS_MAX_WIDTH || height > CANVAS_MAX_HEIGHT;
-    return {
+    const result = {
       x: [xMin, xMax],
       y: [yMin, yMax],
       w: Math.min(width, CANVAS_MAX_WIDTH),
@@ -67,6 +67,13 @@ var App = (function () {
         top,
       },
     };
+    if (hasPotentiallyBrokenScaling) {
+      Object.assign(result, {
+        originalCalculatedWidth: width,
+        originalCalculatedHeight: height,
+      });
+    }
+    return result;
   });
   const TRANSPARENCY_COLOR = 'rgb(100, 100, 100)';
   const tempCanvasesBySpritesheetCollection = new WeakMap();
@@ -356,6 +363,7 @@ var App = (function () {
           tempContext.save();
           if (hasImageScaling) {
             tempContext.translate(tempX, tempY);
+            tempContext.scale(xImageScaling, yImageScaling);
             tempContext.drawImage(
               spritesheets[part.pageId],
               part.img.x, part.img.y, sourceWidth, sourceHeight,

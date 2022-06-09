@@ -447,8 +447,9 @@ function initializePageInstanceWithUnitInfo(pageInstance, unitInfo) {
   if (!unitInfo.backgroundColor) {
     await runCommand([
       ffmpegPath,
+      `-framerate ${metadata.frameRate}`, // fps for input files
       `-i ${frameFileNameFormatWithPath}`,
-      `-r ${metadata.frameRate}`,
+      `-r ${metadata.frameRate}`, // fps for apng
       '-plays 0',
       '-vf setpts=PTS-STARTPTS',
       '-f apng',
@@ -561,7 +562,9 @@ async function getAnimations (unitInfo) {
     // const path = `${argv.gifpath}/${getFileNameForUnitInfo(unitInfo, type)}`;
     // log('Saving GIF', path);
     // return base64BlobToFile(result.blob, path);
-    const useFfmpeg = argv.forceffmpeg || (animationMetadata.width * animationMetadata.height > 1_000_000) || (animationMetadata.width * animationMetadata.height * animationMetadata.numFrames > 100_000_000);
+    const hasLargeCanvas = (animationMetadata.width * animationMetadata.height > 1_000_000) || (animationMetadata.width * animationMetadata.height * animationMetadata.numFrames > 100_000_000);
+    const hasManyParts = animationMetadata.partCountByFrameIndex.some((count) => count > 40);
+    const useFfmpeg = argv.forceffmpeg || hasLargeCanvas || hasManyParts;
     return acc.then(async () => {
       const pageInstance = await getPageInstance();
       const warningsForAnimation = await (!useFfmpeg

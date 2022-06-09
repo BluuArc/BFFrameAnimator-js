@@ -41,7 +41,7 @@ const calculateAnimationBounds = greenlet(function (cgsEntry = [], frames = [], 
     top = -(yMax + yMin) / 2;
   }
   const hasPotentiallyBrokenScaling = width > CANVAS_MAX_WIDTH || height > CANVAS_MAX_HEIGHT;
-  return {
+  const result = {
     x: [xMin, xMax],
     y: [yMin, yMax],
     w: Math.min(width, CANVAS_MAX_WIDTH),
@@ -52,6 +52,13 @@ const calculateAnimationBounds = greenlet(function (cgsEntry = [], frames = [], 
       top,
     },
   };
+  if (hasPotentiallyBrokenScaling) {
+    Object.assign(result, {
+      originalCalculatedWidth: width,
+      originalCalculatedHeight: height,
+    });
+  }
+  return result;
 });
 
 const TRANSPARENCY_COLOR = 'rgb(100, 100, 100)';
@@ -391,6 +398,7 @@ export default class FrameMaker {
         if (hasImageScaling) {
           // assumption: if image scaling is present, then no flipping is present
           tempContext.translate(tempX, tempY);
+          tempContext.scale(xImageScaling, yImageScaling);
           tempContext.drawImage(
             spritesheets[part.pageId],
             part.img.x, part.img.y, sourceWidth, sourceHeight,
