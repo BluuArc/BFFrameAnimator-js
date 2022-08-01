@@ -13,6 +13,7 @@ const unitInput = require('./advanced-units-input'); // read from advanced-units
  * @property {number} numFrames
  * @property {number} width
  * @property {number} height
+ * @property {object} bounds
  * @property {number} frameRate
  * @property {number[]} partCountByFrameIndex
  */
@@ -66,6 +67,11 @@ async function closeConnection () {
     await new Promise((resolve) => { setTimeout(() => resolve(), 1_000); });
   }
   return;
+}
+
+async function refreshActivePageInstance() {
+  const localPageInstance = await getPageInstance();
+  await localPageInstance.goto(`http://localhost:${argv.port}`);
 }
 
 const getFileNameForUnitInfo = (unitInfo, cgsType) => `${unitInfo.type || 'unit'}_${unitInfo.id}_${cgsType}${unitInfo.backgroundColor ? `_bg-${unitInfo.backgroundColor}` : ''}.gif`;
@@ -130,8 +136,8 @@ async function runCommand(command = '') {
   await result;
 }
 
-function initializePageInstanceWithUnitInfo(pageInstance, unitInfo) {
-  return pageInstance.evaluate(async (pageUnitInfo) => {
+function initializePageInstanceWithUnitInfo(pageInstance, unitInfo, returnValues = true) {
+  return pageInstance.evaluate(async ([pageUnitInfo, shouldReturnMapping]) => {
     let errorArgs;
     const warnings = [];
     const originalConsoleError = window.console.error;
@@ -167,45 +173,50 @@ function initializePageInstanceWithUnitInfo(pageInstance, unitInfo) {
     app._frameMaker = frameMaker;
     app._spritesheets = spriteSheets;
 
-    const animationNames = frameMaker.loadedAnimations;
-    const animationNameToInfoMapping = await animationNames.reduce((acc, name) => {
-      return acc.then(async (currentMapping) => {
-        const animation = frameMaker.getAnimation(name);
-        const firstFrame = await frameMaker.getFrame({
-          spritesheets: spriteSheets,
-          animationName: name,
-          animationIndex: 0,
-          cacheNewCanvases: false
+    let result;
+    if (shouldReturnMapping) {
+      const animationNames = frameMaker.loadedAnimations;
+      const animationNameToInfoMapping = await animationNames.reduce((acc, name) => {
+        return acc.then(async (currentMapping) => {
+          const animation = frameMaker.getAnimation(name);
+          const firstFrame = await frameMaker.getFrame({
+            spritesheets: spriteSheets,
+            animationName: name,
+            animationIndex: 0,
+            cacheNewCanvases: false
+          });
+          const firstFrameDelay = +firstFrame.dataset.delay;
+          const allFrameDelaysAreIdentical = animation.frames.every((f) => f.frameDelay === firstFrameDelay);
+          const largestFrameDelay = Math.max(...animation.frames.map((f) => f.frameDelay));
+          let frameRate = 60;
+          if (allFrameDelaysAreIdentical && largestFrameDelay < 10) {
+            frameRate = 60 / largestFrameDelay;
+          }
+          const partCountByFrameIndex = animation.frames.map((cgsFrame, index) => {
+            const cggFrame = frameMaker._frames[cgsFrame.frameIndex];
+            return cggFrame.parts.length;
+          });
+          return currentMapping.concat({
+            name,
+            numFrames: animation.frames.length,
+            width: firstFrame.width,
+            height: firstFrame.height,
+            bounds: animation.bounds,
+            frameRate,
+            partCountByFrameIndex,
+          });
         });
-        const firstFrameDelay = +firstFrame.dataset.delay;
-        const allFrameDelaysAreIdentical = animation.frames.every((f) => f.frameDelay === firstFrameDelay);
-        const largestFrameDelay = Math.max(...animation.frames.map((f) => f.frameDelay));
-        let frameRate = 60;
-        if (allFrameDelaysAreIdentical && largestFrameDelay < 10) {
-          frameRate = 60 / largestFrameDelay;
-        }
-        const partCountByFrameIndex = animation.frames.map((cgsFrame, index) => {
-          const cggFrame = frameMaker._frames[cgsFrame.frameIndex];
-          return cggFrame.parts.length;
-        });
-        return currentMapping.concat({
-          name,
-          numFrames: animation.frames.length,
-          width: firstFrame.width,
-          height: firstFrame.height,
-          frameRate,
-          partCountByFrameIndex,
-        });
-      });
-    }, Promise.resolve([]));
+      }, Promise.resolve([]));
+      result = [animationNameToInfoMapping, warnings];
+    }
     window.console.error = originalConsoleError;
     window.console.warn = originalConsoleWarn;
     window.removeEventListener('error', handleError);
     if (errorArgs) {
       throw new Error(...errorArgs);
     }
-    return [animationNameToInfoMapping, warnings];
-  }, unitInfo);
+    return result;
+  }, [unitInfo, returnValues]);
 }
 
 /**
@@ -218,79 +229,34 @@ function initializePageInstanceWithUnitInfo(pageInstance, unitInfo) {
   const normalizedTempFolder = path.normalize(argv.tempfolder);
 
   // start with fresh instance for larger animations
-  await closeConnection();
+  // await closeConnection();
+  await refreshActivePageInstance();
   let localPageInstance = await getPageInstance();
-  await initializePageInstanceWithUnitInfo(localPageInstance, unitInfo);
+  await initializePageInstanceWithUnitInfo(localPageInstance, { ...unitInfo, bounds: metadata.bounds }, false);
   let pixelsRenderedInPageInstance = 0;
-  const refreshBrowserInstance = async () => {
+  const refreshBrowserInstanceWithUnitInfo = async () => {
     console.log(`[${unitInfo.id}] Refreshing page instance`);
-    await closeConnection();
+    // await closeConnection();
+    await refreshActivePageInstance();
     localPageInstance = await getPageInstance();
-    await initializePageInstanceWithUnitInfo(localPageInstance, unitInfo);
+    await initializePageInstanceWithUnitInfo(localPageInstance, { ...unitInfo, bounds: metadata.bounds }, false);
     pixelsRenderedInPageInstance = 0;
   };
-  const PART_CHUNK_SIZE = 20;
+  const canvasSize = metadata.width * metadata.height;
+  const DEFAULT_PART_CHUNK_SIZE = 20;
+  const MAX_PIXELS_UPDATED_PER_FRAME_THRESHOLD = 10_000_000;
   for (let i = 0; i < metadata.numFrames; ++i) {
-    let blobInfoForFrame;
-    if (metadata.partCountByFrameIndex[i] <= PART_CHUNK_SIZE) {
-      blobInfoForFrame = await localPageInstance.evaluate(async ([pageMetadata, backgroundColor, frameIndex]) => {
-        let errorArgs;
-        const warnings = [];
-        const originalConsoleError = window.console.error;
-        const originalConsoleWarn = window.console.warn;
-        const handleError = function(...args) {
-          originalConsoleError.apply(this, args);
-          errorArgs = args;
-          throw new Error(...args);
-        };
-        window.console.error = handleError;
-        window.console.warn = function (...args) {
-          originalConsoleWarn.apply(this, args);
-          warnings.push(args);
-        };
-        window.addEventListener('error', handleError);
-        /* global GIF app */
-        console.log('generating frame', pageMetadata, backgroundColor, frameIndex);
-        const originalFrame = await app.frameMaker.getFrame({
-          spritesheets: app._spritesheets,
-          animationName: pageMetadata.name,
-          animationIndex: frameIndex,
-          cacheNewCanvases: false
-        });
-        /**
-         * @type {HTMLCanvasElement}
-         */
-        let resultFrame;
-        if (backgroundColor) {
-          resultFrame = app.frameMaker.createFrameWithBackground(originalFrame, backgroundColor);
-        } else {
-          resultFrame = originalFrame;
-        }
-        window.console.error = originalConsoleError;
-        window.console.warn = originalConsoleWarn;
-        window.removeEventListener('error', handleError);
-        if (errorArgs) {
-          throw new Error(...errorArgs);
-        }
-        console.log('finished generating frame', pageMetadata);
-        const blobAsBase64 = await new Promise((fulfill, reject) => {
-          resultFrame.toBlob((blob) => {
-            app.frameMaker._blobToBase64(blob).then(fulfill, reject);
-          });
-        });
-        return {
-          blob: blobAsBase64,
-          delay: Math.floor(originalFrame.dataset.delay / 60 * 1000),
-          warnings,
-        };
-      }, [metadata, unitInfo.backgroundColor, i]);
+    const frameFilePath = path.join(normalizedTempFolder, getFileNameForUnitInfoFrame(unitInfo, metadata.name, i + 1, metadata.frameRate));
+    if (fs.existsSync(frameFilePath)) {
+      console.log(`[${unitInfo.id}][${(new Date()).toLocaleTimeString()}] Skipping generating frame ${i + 1}/${metadata.numFrames} as [${frameFilePath}] already exists `);
+      intermediateFiles.push(frameFilePath);
     } else {
-      // chunk by 20
-      const intermediateBlobInfo = [];
-      let startingPartIndex = metadata.partCountByFrameIndex[i] - 1; // parts are rendered in reverse order, so start from last index
-      while (startingPartIndex >= 0) {
-        console.log(`[${unitInfo.id}][${(new Date()).toLocaleTimeString()}][Frame ${i + 1}/${metadata.numFrames}] Drawing parts ${Math.max(startingPartIndex - (PART_CHUNK_SIZE - 1), 0)} to ${startingPartIndex}`);
-        const blobInfoForCurrentChunk = await localPageInstance.evaluate(async ([pageMetadata, frameIndex, pagePartStartIndex, pagePartChunkSize]) => {
+      let blobInfoForFrame;
+      // assumption: only 25% of parts at most cover the full frame
+      const estimatedPixelsUpdatedInCurrentFrame = metadata.partCountByFrameIndex[i] * 0.25 * canvasSize;
+      const maxNumberOfPixelsUpdatedExceedsThreshold = estimatedPixelsUpdatedInCurrentFrame > MAX_PIXELS_UPDATED_PER_FRAME_THRESHOLD;
+      if (metadata.partCountByFrameIndex[i] <= DEFAULT_PART_CHUNK_SIZE && !maxNumberOfPixelsUpdatedExceedsThreshold) {
+        blobInfoForFrame = await localPageInstance.evaluate(async ([pageMetadata, backgroundColor, frameIndex]) => {
           let errorArgs;
           const warnings = [];
           const originalConsoleError = window.console.error;
@@ -307,15 +273,22 @@ function initializePageInstanceWithUnitInfo(pageInstance, unitInfo) {
           };
           window.addEventListener('error', handleError);
           /* global GIF app */
-          console.log('generating frame', pageMetadata, frameIndex);
+          console.log('generating frame', pageMetadata, backgroundColor, frameIndex);
           const originalFrame = await app.frameMaker.getFrame({
             spritesheets: app._spritesheets,
             animationName: pageMetadata.name,
             animationIndex: frameIndex,
-            cacheNewCanvases: false,
-            startingPartIndex: pagePartStartIndex,
-            numberOfPartsToRender: pagePartChunkSize,
+            cacheNewCanvases: false
           });
+          /**
+           * @type {HTMLCanvasElement}
+           */
+          let resultFrame;
+          if (backgroundColor) {
+            resultFrame = app.frameMaker.createFrameWithBackground(originalFrame, backgroundColor);
+          } else {
+            resultFrame = originalFrame;
+          }
           window.console.error = originalConsoleError;
           window.console.warn = originalConsoleWarn;
           window.removeEventListener('error', handleError);
@@ -324,104 +297,167 @@ function initializePageInstanceWithUnitInfo(pageInstance, unitInfo) {
           }
           console.log('finished generating frame', pageMetadata);
           const blobAsBase64 = await new Promise((fulfill, reject) => {
-            originalFrame.toBlob((blob) => {
+            resultFrame.toBlob((blob) => {
               app.frameMaker._blobToBase64(blob).then(fulfill, reject);
             });
           });
           return {
             blob: blobAsBase64,
-            width: originalFrame.width,
-            height: originalFrame.height,
             delay: Math.floor(originalFrame.dataset.delay / 60 * 1000),
             warnings,
           };
-        }, [metadata, i, startingPartIndex, PART_CHUNK_SIZE]);
-        if (blobInfoForCurrentChunk.warnings.length > 0) {
-          warnings.push({
-            frameIndex: i,
-            partIndexRange: [startingPartIndex - PART_CHUNK_SIZE, startingPartIndex],
-            warnings: blobInfoForCurrentChunk.warnings
-          });
-        }
-        intermediateBlobInfo.push(blobInfoForCurrentChunk);
+        }, [metadata, unitInfo.backgroundColor, i]);
+      } else {
+        // console.log({
+        //   partCount: metadata.partCountByFrameIndex[i],
+        //   canvasSize,
+        //   maxNumberOfPixelsUpdated: metadata.partCountByFrameIndex[i] * canvasSize,
+        //   rawMultiplier: metadata.partCountByFrameIndex[i] * (MAX_PIXELS_UPDATED_PER_FRAME_THRESHOLD / (metadata.partCountByFrameIndex[i] * canvasSize))
+        // });
+        // chunk by 20 or amount of frames such that max number of pixels updated this frame is less than threshold
+        let chunkSize = (maxNumberOfPixelsUpdatedExceedsThreshold && metadata.partCountByFrameIndex[i] <= DEFAULT_PART_CHUNK_SIZE)
+          ? Math.max(Math.floor(metadata.partCountByFrameIndex[i] * (MAX_PIXELS_UPDATED_PER_FRAME_THRESHOLD / estimatedPixelsUpdatedInCurrentFrame)), 1)
+          : DEFAULT_PART_CHUNK_SIZE;
+        console.log(`[${unitInfo.id}][${(new Date()).toLocaleTimeString()}][Frame ${i + 1}/${metadata.numFrames}] Calculated chunk size ${chunkSize}`);
+        const intermediateBlobInfo = [];
+        let startingPartIndex = metadata.partCountByFrameIndex[i] - 1; // parts are rendered in reverse order, so start from last index
+        while (startingPartIndex >= 0) {
+          const partRangeMessage = chunkSize > 1
+            ? `parts ${Math.max(startingPartIndex - (chunkSize - 1), 0)} to ${startingPartIndex}`
+            : `part ${startingPartIndex}`;
+          console.log(`[${unitInfo.id}][${(new Date()).toLocaleTimeString()}][Frame ${i + 1}/${metadata.numFrames}] Drawing ${partRangeMessage}`);
+          const blobInfoForCurrentChunk = await localPageInstance.evaluate(async ([pageMetadata, frameIndex, pagePartStartIndex, pagePartChunkSize]) => {
+            let errorArgs;
+            const warnings = [];
+            const originalConsoleError = window.console.error;
+            const originalConsoleWarn = window.console.warn;
+            const handleError = function(...args) {
+              originalConsoleError.apply(this, args);
+              errorArgs = args;
+              throw new Error(...args);
+            };
+            window.console.error = handleError;
+            window.console.warn = function (...args) {
+              originalConsoleWarn.apply(this, args);
+              warnings.push(args);
+            };
+            window.addEventListener('error', handleError);
+            /* global GIF app */
+            console.log('generating frame', pageMetadata, frameIndex);
+            const originalFrame = await app.frameMaker.getFrame({
+              spritesheets: app._spritesheets,
+              animationName: pageMetadata.name,
+              animationIndex: frameIndex,
+              cacheNewCanvases: false,
+              startingPartIndex: pagePartStartIndex,
+              numberOfPartsToRender: pagePartChunkSize,
+            });
+            window.console.error = originalConsoleError;
+            window.console.warn = originalConsoleWarn;
+            window.removeEventListener('error', handleError);
+            if (errorArgs) {
+              throw new Error(...errorArgs);
+            }
+            console.log('finished generating frame', pageMetadata);
+            const blobAsBase64 = await new Promise((fulfill, reject) => {
+              originalFrame.toBlob((blob) => {
+                app.frameMaker._blobToBase64(blob).then(fulfill, reject);
+              });
+            });
+            return {
+              blob: blobAsBase64,
+              width: originalFrame.width,
+              height: originalFrame.height,
+              delay: Math.floor(originalFrame.dataset.delay / 60 * 1000),
+              warnings,
+            };
+          }, [metadata, i, startingPartIndex, chunkSize]);
+          if (blobInfoForCurrentChunk.warnings.length > 0) {
+            warnings.push({
+              frameIndex: i,
+              partIndexRange: [startingPartIndex - chunkSize, startingPartIndex],
+              warnings: blobInfoForCurrentChunk.warnings
+            });
+          }
+          intermediateBlobInfo.push(blobInfoForCurrentChunk);
 
-        // reset browser after every iteration
-        await refreshBrowserInstance();
-        startingPartIndex -= PART_CHUNK_SIZE;
+          // reset browser after every iteration
+          await refreshBrowserInstanceWithUnitInfo();
+          startingPartIndex -= chunkSize;
+        }
+
+        console.log(`[${unitInfo.id}][${(new Date()).toLocaleTimeString()}] Merging ${intermediateBlobInfo.length} intermediate frames`);
+        blobInfoForFrame = await localPageInstance.evaluate(async ([pageIntermediateBlobInfo, backgroundColor]) => {
+          let errorArgs;
+          const warnings = [];
+          const originalConsoleError = window.console.error;
+          const originalConsoleWarn = window.console.warn;
+          const handleError = function(...args) {
+            originalConsoleError.apply(this, args);
+            errorArgs = args;
+            throw new Error(...args);
+          };
+          window.console.error = handleError;
+          window.console.warn = function (...args) {
+            originalConsoleWarn.apply(this, args);
+            warnings.push(args);
+          };
+          window.addEventListener('error', handleError);
+
+          console.log('generating frame', pageIntermediateBlobInfo, backgroundColor);
+
+          const resultFrame = document.createElement('canvas');
+          resultFrame.width = pageIntermediateBlobInfo[0].width;
+          resultFrame.height = pageIntermediateBlobInfo[0].height;
+          const resultFrameContext = resultFrame.getContext('2d');
+          if (backgroundColor) {
+            resultFrameContext.fillStyle = backgroundColor;
+            resultFrameContext.fillRect(0, 0, resultFrame.width, resultFrame.height);
+          }
+
+          for (const blobInfo of pageIntermediateBlobInfo) {
+            const imageForIntermediateFrame = await new Promise((fulfill, reject) => {
+              const image = new Image();
+              image.onload = () => fulfill(image);
+              image.onerror = image.onabort = reject;
+              image.src = `data:image/png;base64,${blobInfo.blob}`;
+            });
+            resultFrameContext.drawImage(imageForIntermediateFrame, 0, 0);
+          }
+
+          const blobAsBase64 = await new Promise((fulfill, reject) => {
+            resultFrame.toBlob((blob) => {
+              app.frameMaker._blobToBase64(blob).then(fulfill, reject);
+            });
+          });
+
+          window.console.error = originalConsoleError;
+          window.console.warn = originalConsoleWarn;
+          window.removeEventListener('error', handleError);
+          if (errorArgs) {
+            throw new Error(...errorArgs);
+          }
+
+          return {
+            blob: blobAsBase64,
+            delay: pageIntermediateBlobInfo[0].delay,
+            warnings,
+          };
+        }, [intermediateBlobInfo, unitInfo.backgroundColor]);
       }
-
-      console.log(`[${unitInfo.id}][${(new Date()).toLocaleTimeString()}] Merging ${intermediateBlobInfo.length} intermediate frames`);
-      blobInfoForFrame = await localPageInstance.evaluate(async ([pageIntermediateBlobInfo, backgroundColor]) => {
-        let errorArgs;
-        const warnings = [];
-        const originalConsoleError = window.console.error;
-        const originalConsoleWarn = window.console.warn;
-        const handleError = function(...args) {
-          originalConsoleError.apply(this, args);
-          errorArgs = args;
-          throw new Error(...args);
-        };
-        window.console.error = handleError;
-        window.console.warn = function (...args) {
-          originalConsoleWarn.apply(this, args);
-          warnings.push(args);
-        };
-        window.addEventListener('error', handleError);
-
-        console.log('generating frame', pageIntermediateBlobInfo, backgroundColor);
-
-        const resultFrame = document.createElement('canvas');
-        resultFrame.width = pageIntermediateBlobInfo[0].width;
-        resultFrame.height = pageIntermediateBlobInfo[0].height;
-        const resultFrameContext = resultFrame.getContext('2d');
-        if (backgroundColor) {
-          resultFrameContext.fillStyle = backgroundColor;
-          resultFrameContext.fillRect(0, 0, resultFrame.width, resultFrame.height);
-        }
-
-        for (const blobInfo of pageIntermediateBlobInfo) {
-          const imageForIntermediateFrame = await new Promise((fulfill, reject) => {
-            const image = new Image();
-            image.onload = () => fulfill(image);
-            image.onerror = image.onabort = reject;
-            image.src = `data:image/png;base64,${blobInfo.blob}`;
-          });
-          resultFrameContext.drawImage(imageForIntermediateFrame, 0, 0);
-        }
-
-        const blobAsBase64 = await new Promise((fulfill, reject) => {
-          resultFrame.toBlob((blob) => {
-            app.frameMaker._blobToBase64(blob).then(fulfill, reject);
-          });
+      console.log(`[${unitInfo.id}][${(new Date()).toLocaleTimeString()}] Saving frame ${i + 1}/${metadata.numFrames}`, frameFilePath);
+      await base64BlobToFile(blobInfoForFrame.blob, frameFilePath);
+      intermediateFiles.push(frameFilePath);
+      if (blobInfoForFrame.warnings.length > 0) {
+        warnings.push({
+          frameIndex: i,
+          warnings: blobInfoForFrame.warnings
         });
-
-        window.console.error = originalConsoleError;
-        window.console.warn = originalConsoleWarn;
-        window.removeEventListener('error', handleError);
-        if (errorArgs) {
-          throw new Error(...errorArgs);
-        }
-
-        return {
-          blob: blobAsBase64,
-          delay: pageIntermediateBlobInfo[0].delay,
-          warnings,
-        };
-      }, [intermediateBlobInfo, unitInfo.backgroundColor]);
-    }
-    const frameFilePath = path.join(normalizedTempFolder, getFileNameForUnitInfoFrame(unitInfo, metadata.name, i + 1, metadata.frameRate));
-    console.log(`[${unitInfo.id}][${(new Date()).toLocaleTimeString()}] Saving frame ${i + 1}/${metadata.numFrames}`, frameFilePath);
-    await base64BlobToFile(blobInfoForFrame.blob, frameFilePath);
-    intermediateFiles.push(frameFilePath);
-    if (blobInfoForFrame.warnings.length > 0) {
-      warnings.push({
-        frameIndex: i,
-        warnings: blobInfoForFrame.warnings
-      });
-    }
-    pixelsRenderedInPageInstance += metadata.width * metadata.height;
-    if (pixelsRenderedInPageInstance > 25_000_000) {
-      await refreshBrowserInstance();
+      }
+      pixelsRenderedInPageInstance += metadata.width * metadata.height;
+      if (pixelsRenderedInPageInstance > 25_000_000) {
+        await refreshBrowserInstanceWithUnitInfo();
+      }
     }
   }
   const fileNameFormat = getFileNameForUnitInfoFrame(unitInfo, metadata.name, 0, metadata.frameRate).replace('-F0000-', '-F%04d-');
@@ -564,7 +600,7 @@ async function getAnimations (unitInfo) {
     // return base64BlobToFile(result.blob, path);
     const hasLargeCanvas = (animationMetadata.width * animationMetadata.height > 1_000_000) || (animationMetadata.width * animationMetadata.height * animationMetadata.numFrames > 100_000_000);
     const hasManyParts = animationMetadata.partCountByFrameIndex.some((count) => count > 40);
-    const useFfmpeg = argv.forceffmpeg || hasLargeCanvas || hasManyParts;
+    const useFfmpeg = argv.forceffmpeg || hasLargeCanvas || hasManyParts || animationMetadata.numFrames > 50;
     return acc.then(async () => {
       const pageInstance = await getPageInstance();
       const warningsForAnimation = await (!useFfmpeg
@@ -597,7 +633,8 @@ async function getAnimations (unitInfo) {
 
   // reset the browser every so often to avoid hangups
   if (count > 1) {
-    await closeConnection();
+    // await closeConnection();
+    await refreshActivePageInstance();
     count = 0;
   }
 

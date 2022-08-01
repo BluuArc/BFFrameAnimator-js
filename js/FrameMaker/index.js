@@ -176,7 +176,7 @@ export default class FrameMaker {
     // add found cgs animations to maker
     await Promise.all(cgsPromises);
     for (const key in cgsCsv) {
-      await maker.addAnimation(key, cgsCsv[key], doTrim);
+      await maker.addAnimation(key, cgsCsv[key], doTrim, input.bounds);
     }
 
     // return the spritesheet and FrameMaker instance
@@ -257,25 +257,28 @@ export default class FrameMaker {
     }); // filter out unparseable frames
   }
 
-  async addAnimation (key = 'name', csv = [], doTrim) {
+  async addAnimation (key = 'name', csv = [], doTrim, inputBounds) {
     const cgsFrames = this._processCgs(csv);
     const lowercaseKey = key.toLowerCase();
     const trim = doTrim === undefined ?
       (!lowercaseKey.includes('atk') && !lowercaseKey.includes('xbb')) :
       doTrim;
-    let bounds = await calculateAnimationBounds(
-      cgsFrames,
-      this._frames,
-      trim,
-    );
-    if (bounds.ignoreScaling) {
-      console.warn(`Recalculating bounds without scaling info due to potentially broken scaling information`, { originalBounds: bounds });
+    let bounds = inputBounds;
+    if (!inputBounds) {
       bounds = await calculateAnimationBounds(
         cgsFrames,
         this._frames,
         trim,
-        true,
       );
+      if (bounds.ignoreScaling) {
+        console.warn(`Recalculating bounds without scaling info due to potentially broken scaling information`, { originalBounds: bounds });
+        bounds = await calculateAnimationBounds(
+          cgsFrames,
+          this._frames,
+          trim,
+          true,
+        );
+      }
     }
 
     this._animations[key] = {
