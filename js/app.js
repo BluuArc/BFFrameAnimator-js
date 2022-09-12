@@ -50,6 +50,7 @@ export default class App {
       numFrames: 0,
       frameIndex: 0,
       animationUrls: {},
+      outputSheetInfo: {},
       isAdvancedInput: false,
       advancedSettings: {
         numSpritesheets: 2,
@@ -120,6 +121,7 @@ export default class App {
         generateAnimation: () => this.generateAnimation(),
         renderFrame: (...args) => this.renderFrame(...args),
         generateGif: (...args) => this.generateGif(...args),
+        generateOutputSheet: (...args) => this.generateOutputSheet(...args),
         animate: () => this.animate(),
         generateColorPreviewStyles: (color) => `width: 2em; background: ${color}; height: 1em; border: 1px solid black; display: inline-block;`,
       },
@@ -286,6 +288,7 @@ export default class App {
     // notify that animations are finished
     this._vueData.animationReady = true;
     this._vueData.animationUrls = {};
+    this._vueData.outputSheetInfo = {};
     this._vueData.activeAnimation = animationNames[0];
     this._setProgress(100, 100);
     this._setLog(`Successfully generated animation for ${!this._vueData.isAdvancedInput ? this._vueData.unitId : 'advanced input'}`, false);
@@ -374,6 +377,34 @@ export default class App {
 
     this._setProgress(undefined, 100);
     this._setLog(`Successfully generated GIF for ${animationName}`, false);
+  }
+
+  async generateOutputSheet (animationName) {
+    this._vueData.isPlaying = false;
+    this._vueData.errorOccurred = false;
+
+    this._setLog(`Creating sheet for ${animationName} [0.00%]`, true);
+    this._setProgress(Infinity, 0);
+    await waitForIdleFrame();
+    try {
+      this._vueData.outputSheetInfo[animationName] = await this._frameMaker.toSheet({
+        spritesheets: this._spritesheets,
+        animationName,
+        onProgressUpdate: (amt) => {
+          this._setLog(`Creating sheet [${(amt * 100).toFixed(2)}%]`);
+          this._setProgress(undefined, Math.floor(amt * 100));
+        },
+      });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(err);
+      this._vueData.errorOccurred = true;
+      this._setLog(`Error generating sheet for ${animationName}`, false);
+      return;
+    }
+
+    this._setProgress(undefined, 100);
+    this._setLog(`Successfully generated sheet for ${animationName}`, false);
   }
 
   async animate () {

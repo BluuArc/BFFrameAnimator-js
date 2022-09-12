@@ -621,6 +621,85 @@ var App = (function () {
       }
       return animationEntry.gif[backgroundColor];
     }
+    _findFactorsWithSmallestDifference(number) {
+      if (number === 0) {
+        throw new Error("The argument cannot be 0");
+      }
+      const allFactors = [...Array(number + 1).keys()].filter((v) => number % v === 0);
+      let factorWithSmallestDifference;
+      let smallestDifference = Infinity;
+      allFactors.forEach((factor) => {
+        const pairedFactor = number / factor;
+        const difference = Math.abs(pairedFactor - factor);
+        if (difference < smallestDifference) {
+          factorWithSmallestDifference = factor;
+          smallestDifference = difference;
+        }
+      });
+      return [factorWithSmallestDifference, number / factorWithSmallestDifference]
+    }
+    async toSheet({
+      spritesheets = [],
+      animationName = 'name',
+      referenceCanvas,
+      forceRedraw = false,
+      flipHorizontal = false,
+      flipVertical = false,
+      cacheNewCanvases = true,
+      onProgressUpdate,
+    }) {
+      const animationEntry = this._animations[animationName];
+      if (!animationEntry) {
+        throw new Error(`No animation entry found with name ${animationName}`);
+      }
+      if (!animationEntry.sheet) {
+        const hasOnProgressUpdateFunction = typeof onProgressUpdate === 'function';
+        const numFrames = animationEntry.frames.length;
+        let [verticalFrameCount, horizontalFrameCount] = this._findFactorsWithSmallestDifference(numFrames);
+        if (Math.abs(verticalFrameCount - horizontalFrameCount) === numFrames - 1 && numFrames >= 7) {
+          [verticalFrameCount, horizontalFrameCount] = this._findFactorsWithSmallestDifference(numFrames + 1);
+        }
+        let outputCanvas;
+        let outputCanvasContext;
+        let xStart = 0;
+        let yStart = 0;
+        let xFrameIndex = 0;
+        for (let i = 0; i < numFrames; ++i) {
+          if (hasOnProgressUpdateFunction) {
+            onProgressUpdate(+((i/numFrames).toFixed(2)));
+          }
+          const originalFrame = await this.getFrame({
+            spritesheets,
+            animationName,
+            animationIndex: i,
+            referenceCanvas,
+            forceRedraw,
+            flipHorizontal,
+            flipVertical,
+            cacheNewCanvases,
+          });
+          if (!outputCanvas) {
+            outputCanvas = document.createElement('canvas');
+            outputCanvas.width = horizontalFrameCount * originalFrame.width;
+            outputCanvas.height = verticalFrameCount * originalFrame.height;
+          }
+          outputCanvasContext = outputCanvasContext || outputCanvas.getContext('2d');
+          outputCanvasContext.drawImage(originalFrame, xStart, yStart);
+          xFrameIndex = (xFrameIndex + 1) % horizontalFrameCount;
+          xStart = (xFrameIndex !== 0) ? (xStart + originalFrame.width) : 0;
+          if (xStart === 0) {
+            yStart += originalFrame.height;
+          }
+        }
+        animationEntry.sheet = {
+          url: outputCanvas.toDataURL("image/png"),
+          horizontalFrameCount,
+          verticalFrameCount,
+          delays: animationEntry.frames.map((e) => e.frameDelay)
+        };
+      }
+      return animationEntry.sheet;
+    }
   }
 
   window.FrameMaker = FrameMaker;
@@ -660,6 +739,7 @@ var App = (function () {
         numFrames: 0,
         frameIndex: 0,
         animationUrls: {},
+        outputSheetInfo: {},
         isAdvancedInput: false,
         advancedSettings: {
           numSpritesheets: 2,
@@ -729,6 +809,7 @@ var App = (function () {
           generateAnimation: () => this.generateAnimation(),
           renderFrame: (...args) => this.renderFrame(...args),
           generateGif: (...args) => this.generateGif(...args),
+          generateOutputSheet: (...args) => this.generateOutputSheet(...args),
           animate: () => this.animate(),
           generateColorPreviewStyles: (color) => `width: 2em; background: ${color}; height: 1em; border: 1px solid black; display: inline-block;`,
         },
@@ -864,6 +945,7 @@ var App = (function () {
       }
       this._vueData.animationReady = true;
       this._vueData.animationUrls = {};
+      this._vueData.outputSheetInfo = {};
       this._vueData.activeAnimation = animationNames[0];
       this._setProgress(100, 100);
       this._setLog(`Successfully generated animation for ${!this._vueData.isAdvancedInput ? this._vueData.unitId : 'advanced input'}`, false);
@@ -933,6 +1015,30 @@ var App = (function () {
       }
       this._setProgress(undefined, 100);
       this._setLog(`Successfully generated GIF for ${animationName}`, false);
+    }
+    async generateOutputSheet (animationName) {
+      this._vueData.isPlaying = false;
+      this._vueData.errorOccurred = false;
+      this._setLog(`Creating sheet for ${animationName} [0.00%]`, true);
+      this._setProgress(Infinity, 0);
+      await waitForIdleFrame();
+      try {
+        this._vueData.outputSheetInfo[animationName] = await this._frameMaker.toSheet({
+          spritesheets: this._spritesheets,
+          animationName,
+          onProgressUpdate: (amt) => {
+            this._setLog(`Creating sheet [${(amt * 100).toFixed(2)}%]`);
+            this._setProgress(undefined, Math.floor(amt * 100));
+          },
+        });
+      } catch (err) {
+        console.error(err);
+        this._vueData.errorOccurred = true;
+        this._setLog(`Error generating sheet for ${animationName}`, false);
+        return;
+      }
+      this._setProgress(undefined, 100);
+      this._setLog(`Successfully generated sheet for ${animationName}`, false);
     }
     async animate () {
       if (this._framesUntilRedraw <= 0) {

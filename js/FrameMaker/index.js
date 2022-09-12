@@ -706,4 +706,91 @@ export default class FrameMaker {
 
     return animationEntry.gif[backgroundColor];
   }
+
+  _findFactorsWithSmallestDifference(number) {
+    if (number === 0) {
+      throw new Error("The argument cannot be 0");
+    }
+    // there is at least one factor for every number
+    const allFactors = [...Array(number + 1).keys()].filter((v) => number % v === 0);
+    let factorWithSmallestDifference;
+    let smallestDifference = Infinity;
+    allFactors.forEach((factor) => {
+      const pairedFactor = number / factor;
+      const difference = Math.abs(pairedFactor - factor);
+      if (difference < smallestDifference) {
+        factorWithSmallestDifference = factor;
+        smallestDifference = difference;
+      }
+    });
+    return [factorWithSmallestDifference, number / factorWithSmallestDifference]
+  }
+
+  async toSheet({
+    spritesheets = [], // array of img elements containing sprite sheets
+    animationName = 'name',
+    referenceCanvas, // referenced for dimensions on first draw, otherwise optional
+    forceRedraw = false,
+    flipHorizontal = false,
+    flipVertical = false,
+    cacheNewCanvases = true,
+    onProgressUpdate,
+  }) {
+    const animationEntry = this._animations[animationName];
+    if (!animationEntry) {
+      throw new Error(`No animation entry found with name ${animationName}`);
+    }
+
+    if (!animationEntry.sheet) {
+      const hasOnProgressUpdateFunction = typeof onProgressUpdate === 'function';
+      const numFrames = animationEntry.frames.length;
+      // create a square-ish canvas where possible, preferring wider canvases over taller canvases
+      let [verticalFrameCount, horizontalFrameCount] = this._findFactorsWithSmallestDifference(numFrames);
+      if (Math.abs(verticalFrameCount - horizontalFrameCount) === numFrames - 1 && numFrames >= 7) {
+        [verticalFrameCount, horizontalFrameCount] = this._findFactorsWithSmallestDifference(numFrames + 1);
+      }
+      let outputCanvas;
+      let outputCanvasContext;
+      let xStart = 0;
+      let yStart = 0;
+      let xFrameIndex = 0;
+      for (let i = 0; i < numFrames; ++i) {
+        if (hasOnProgressUpdateFunction) {
+          onProgressUpdate(+((i/numFrames).toFixed(2)))
+        }
+        const originalFrame = await this.getFrame({
+          spritesheets,
+          animationName,
+          animationIndex: i,
+          referenceCanvas,
+          forceRedraw,
+          flipHorizontal,
+          flipVertical,
+          cacheNewCanvases,
+        });
+        if (!outputCanvas) {
+          outputCanvas = document.createElement('canvas');
+          outputCanvas.width = horizontalFrameCount * originalFrame.width;
+          outputCanvas.height = verticalFrameCount * originalFrame.height;
+        }
+        outputCanvasContext = outputCanvasContext || outputCanvas.getContext('2d');
+        outputCanvasContext.drawImage(originalFrame, xStart, yStart);
+        xFrameIndex = (xFrameIndex + 1) % horizontalFrameCount;
+        xStart = (xFrameIndex !== 0) ? (xStart + originalFrame.width) : 0;
+        if (xStart === 0) {
+          yStart += originalFrame.height;
+        }
+      }
+
+      animationEntry.sheet = {
+        url: outputCanvas.toDataURL("image/png"),
+        horizontalFrameCount,
+        verticalFrameCount,
+        // time to render next frame
+        delays: animationEntry.frames.map((e) => e.frameDelay)
+      };
+    }
+
+    return animationEntry.sheet;
+  }
 }
