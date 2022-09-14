@@ -479,6 +479,19 @@ var App = (function () {
           );
         }
         frameContext.stroke();
+        frameContext.fillStyle = "red";
+        frameContext.fillRect(
+          origin.x + bounds.offset.left - 10,
+          origin.y + bounds.offset.top - 1,
+          20,
+          3
+        );
+        frameContext.fillRect(
+          origin.x + bounds.offset.left - 1,
+          origin.y + bounds.offset.top - 10,
+          3,
+          20
+        );
         frameContext.restore();
       }
       if (cacheNewCanvases) {
@@ -1053,6 +1066,22 @@ var App = (function () {
     }
     get frameMaker () {
       return this._frameMaker;
+    }
+    async generateAnimationMetadataForSheet(currentAnimation = this._currentAnimation) {
+      if (!this._vueData.outputSheetInfo[currentAnimation]) {
+        await this.generateOutputSheet(currentAnimation);
+      }
+      const { horizontalFrameCount, verticalFrameCount, delays } = this._vueData.outputSheetInfo[currentAnimation];
+      const { bounds: animationBounds } = this._frameMaker.getAnimation(currentAnimation);
+      return {
+        name: currentAnimation,
+        filename: `${currentAnimation}.png`,
+        gameOriginX: animationBounds.offset.left + (animationBounds.w / 2),
+        gameOriginY: animationBounds.offset.top + (animationBounds.h / 2),
+        horizontalFrameCount,
+        verticalFrameCount,
+        delays,
+      }
     }
   }
 

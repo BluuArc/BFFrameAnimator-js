@@ -423,4 +423,22 @@ export default class App {
   get frameMaker () {
     return this._frameMaker;
   }
+
+  async generateAnimationMetadataForSheet(currentAnimation = this._currentAnimation) {
+    if (!this._vueData.outputSheetInfo[currentAnimation]) {
+      await this.generateOutputSheet(currentAnimation);
+    }
+    const { horizontalFrameCount, verticalFrameCount, delays } = this._vueData.outputSheetInfo[currentAnimation];
+    const { bounds: animationBounds } = this._frameMaker.getAnimation(currentAnimation);
+    return {
+      name: currentAnimation,
+      filename: `${currentAnimation}.png`,
+      // point that the game considers (0,0) when creating frames
+      gameOriginX: animationBounds.offset.left + (animationBounds.w / 2),
+      gameOriginY: animationBounds.offset.top + (animationBounds.h / 2),
+      horizontalFrameCount,
+      verticalFrameCount,
+      delays,
+    }
+  }
 }

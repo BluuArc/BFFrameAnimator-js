@@ -543,6 +543,21 @@ export default class FrameMaker {
         );
       }
       frameContext.stroke();
+
+      // drawing game origin
+      frameContext.fillStyle = "red";
+      frameContext.fillRect( // horizontal of +
+        origin.x + bounds.offset.left - 10,
+        origin.y + bounds.offset.top - 1,
+        20,
+        3
+      );
+      frameContext.fillRect( // vertical of +
+        origin.x + bounds.offset.left - 1,
+        origin.y + bounds.offset.top - 10,
+        3,
+        20
+      );
       frameContext.restore();
     }
     if (cacheNewCanvases) {
