@@ -741,6 +741,21 @@ export default class FrameMaker {
     return [factorWithSmallestDifference, number / factorWithSmallestDifference]
   }
 
+  getSheetMetadata(animationEntry) {
+    const numFrames = animationEntry.frames.length;
+    // create a square-ish canvas where possible, preferring wider canvases over taller canvases
+    let [verticalFrameCount, horizontalFrameCount] = this._findFactorsWithSmallestDifference(numFrames);
+    if (Math.abs(verticalFrameCount - horizontalFrameCount) === numFrames - 1 && numFrames >= 7) {
+      [verticalFrameCount, horizontalFrameCount] = this._findFactorsWithSmallestDifference(numFrames + 1);
+    }
+    return {
+      horizontalFrameCount,
+      verticalFrameCount,
+      // time to render next frame in number of frames to wait
+      delays: animationEntry.frames.map((e) => e.frameDelay)
+    }
+  }
+
   async toSheet({
     spritesheets = [], // array of img elements containing sprite sheets
     animationName = 'name',
@@ -758,12 +773,9 @@ export default class FrameMaker {
 
     if (!animationEntry.sheet) {
       const hasOnProgressUpdateFunction = typeof onProgressUpdate === 'function';
+      const sheetMetadata = this.getSheetMetadata(animationEntry);
+      const { verticalFrameCount, horizontalFrameCount } = sheetMetadata;
       const numFrames = animationEntry.frames.length;
-      // create a square-ish canvas where possible, preferring wider canvases over taller canvases
-      let [verticalFrameCount, horizontalFrameCount] = this._findFactorsWithSmallestDifference(numFrames);
-      if (Math.abs(verticalFrameCount - horizontalFrameCount) === numFrames - 1 && numFrames >= 7) {
-        [verticalFrameCount, horizontalFrameCount] = this._findFactorsWithSmallestDifference(numFrames + 1);
-      }
       let outputCanvas;
       let outputCanvasContext;
       let xStart = 0;
@@ -797,12 +809,18 @@ export default class FrameMaker {
         }
       }
 
+      const blob = await new Promise((resolve, reject) => {
+        try {
+          outputCanvas.toBlob((localBlob) => resolve(localBlob));
+        } catch (e) {
+          reject(e);
+        }
+      })
+
       animationEntry.sheet = {
         url: outputCanvas.toDataURL("image/png"),
-        horizontalFrameCount,
-        verticalFrameCount,
-        // time to render next frame
-        delays: animationEntry.frames.map((e) => e.frameDelay)
+        blob: await this._blobToBase64(blob),
+        ...sheetMetadata,
       };
     }
 

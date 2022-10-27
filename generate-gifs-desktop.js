@@ -16,6 +16,17 @@ const unitInput = require('./advanced-units-input'); // read from advanced-units
  * @property {object} bounds
  * @property {number} frameRate
  * @property {number[]} partCountByFrameIndex
+ * @property {SheetMetadata} sheetMetadata
+ */
+
+/**
+ * @typedef SheetMetadata
+ * @property {string} name
+ * @property {number} gameOriginX
+ * @property {number} gameOriginY
+ * @property {number} horizontalFrameCount
+ * @property {number} verticalFrameCount
+ * @property {number[]} delays
  */
 
 let browserInstance, pageInstance;
@@ -76,13 +87,21 @@ async function refreshActivePageInstance() {
 
 const getFileNameForUnitInfo = (unitInfo, cgsType) => `${unitInfo.type || 'unit'}_${unitInfo.id}_${cgsType}${unitInfo.backgroundColor ? `_bg-${unitInfo.backgroundColor}` : ''}.gif`;
 const getFileNameForUnitInfoFrame = (unitInfo, cgsType, frameIndex, delay) => `${unitInfo.type || 'unit'}_${unitInfo.id}_${cgsType}${unitInfo.backgroundColor ? `_bg-${unitInfo.backgroundColor}` : ''}-F${String.prototype.padStart.call(`${frameIndex}`, 4, '0')}-${delay}.png`;
+const getSheetFolderNameForUnitInfo = (unitInfo, cgsType) => [
+  `${unitInfo.type || 'unit'}_${unitInfo.id}`,
+  cgsType && `${cgsType}${unitInfo.backgroundColor ? `_bg-${unitInfo.backgroundColor}` : ''}`
+].filter(v => !!v).join("/");
+const getSheetFileNameForUnitInfo = (unitInfo, cgsType) => `${unitInfo.type || 'unit'}_${unitInfo.id}_${cgsType}${unitInfo.backgroundColor ? `_bg-${unitInfo.backgroundColor}` : ''}.png`;
+
+const shouldOutputSpritesheets = () => !!argv.sheetonly;
 
 /**
  * @param {AnimationMetadata} metadata
  */
-async function generateGifThroughPage(metadata, unitInfo, pageInstance) {
+async function generateAnimationThroughPage(metadata, unitInfo, pageInstance) {
   console.log(`[${unitInfo.id}] Using GIF.js`);
-  const [result, warnings] = await pageInstance.evaluate(async ([pageType, backgroundColor]) => {
+  const outputSpritesheets = shouldOutputSpritesheets();
+  const [result, warnings] = await pageInstance.evaluate(async ([pageType, backgroundColor, pageOutputSpritesheets]) => {
     let errorArgs;
     const warnings = [];
     const originalConsoleError = window.console.error;
@@ -99,31 +118,48 @@ async function generateGifThroughPage(metadata, unitInfo, pageInstance) {
     };
     window.addEventListener('error', handleError);
     /* global GIF app */
-    console.log('generating gif', pageType, backgroundColor);
-    const gif = await app.frameMaker.toGif({
-      spritesheets: app._spritesheets,
-      animationName: pageType,
-      GifClass: GIF,
-      backgroundColor,
-      useTransparency: !backgroundColor,
-      cacheNewCanvases: false,
-      onProgressUpdate: (amt) => {
-        console.log(`[${pageType}] Creating GIF [${(amt * 100).toFixed(2)}%]`);
-      }
-    });
+    console.log('generating animation', pageType, backgroundColor);
+    let result;
+    if (pageOutputSpritesheets) {
+      result = await app.frameMaker.toSheet({
+        spritesheets: app._spritesheets,
+        animationName: pageType,
+        backgroundColor,
+        useTransparency: !backgroundColor,
+        cacheNewCanvases: false,
+        onProgressUpdate: (amt) => {
+          console.log(`[${pageType}] Creating sheet [${(amt * 100).toFixed(2)}%]`);
+        }
+      });
+    } else {
+      result = await app.frameMaker.toGif({
+        spritesheets: app._spritesheets,
+        animationName: pageType,
+        GifClass: GIF,
+        backgroundColor,
+        useTransparency: !backgroundColor,
+        cacheNewCanvases: false,
+        onProgressUpdate: (amt) => {
+          console.log(`[${pageType}] Creating GIF [${(amt * 100).toFixed(2)}%]`);
+        }
+      });
+    }
     window.console.error = originalConsoleError;
     window.console.warn = originalConsoleWarn;
     window.removeEventListener('error', handleError);
     if (errorArgs) {
       throw new Error(...errorArgs);
     }
-    console.log('finished generating gif', gif, pageType);
-    return [gif, warnings];
-  }, [metadata.name, unitInfo.backgroundColor]);
+    console.log('finished generating animation', result, pageType);
+    return [result, warnings];
+  }, [metadata.name, unitInfo.backgroundColor, outputSpritesheets]);
 
-  const path = `${argv.gifpath}/${getFileNameForUnitInfo(unitInfo, metadata.name)}`;
+  let path = `${argv.gifpath}/${getFileNameForUnitInfo(unitInfo, metadata.name)}`;
+  if (outputSpritesheets) {
+    path = `${argv.gifpath}/${getSheetFolderNameForUnitInfo(unitInfo)}/${getSheetFileNameForUnitInfo(unitInfo, metadata.name)}`;
+  }
   // eslint-disable-next-line no-console
-  console.log(`[${unitInfo.id}] Saving GIF`, path);
+  console.log(`[${unitInfo.id}] Saving animation`, path);
   await base64BlobToFile(result.blob, path);
   return warnings;
 }
@@ -196,6 +232,7 @@ function initializePageInstanceWithUnitInfo(pageInstance, unitInfo, returnValues
             const cggFrame = frameMaker._frames[cgsFrame.frameIndex];
             return cggFrame.parts.length;
           });
+          const sheetMetadata = frameMaker.getSheetMetadata(frameMaker.getAnimation(name));
           return currentMapping.concat({
             name,
             numFrames: animation.frames.length,
@@ -204,6 +241,7 @@ function initializePageInstanceWithUnitInfo(pageInstance, unitInfo, returnValues
             bounds: animation.bounds,
             frameRate,
             partCountByFrameIndex,
+            sheetMetadata,
           });
         });
       }, Promise.resolve([]));
@@ -226,7 +264,14 @@ function initializePageInstanceWithUnitInfo(pageInstance, unitInfo, returnValues
   console.log(`[${unitInfo.id}] Using ffmpeg`);
   const intermediateFiles = [];
   const warnings = [];
-  const normalizedTempFolder = path.normalize(argv.tempfolder);
+  const outputSpritesheets = shouldOutputSpritesheets();
+  const targetFolder = outputSpritesheets
+    ? path.join(argv.gifpath, getSheetFolderNameForUnitInfo(unitInfo, metadata.name))
+    : path.normalize(argv.tempfolder);
+
+    if (!fs.existsSync(targetFolder)) {
+      fs.mkdirSync(targetFolder);
+    }
 
   // start with fresh instance for larger animations
   // await closeConnection();
@@ -246,7 +291,7 @@ function initializePageInstanceWithUnitInfo(pageInstance, unitInfo, returnValues
   const DEFAULT_PART_CHUNK_SIZE = 20;
   const MAX_PIXELS_UPDATED_PER_FRAME_THRESHOLD = 10_000_000;
   for (let i = 0; i < metadata.numFrames; ++i) {
-    const frameFilePath = path.join(normalizedTempFolder, getFileNameForUnitInfoFrame(unitInfo, metadata.name, i + 1, metadata.frameRate));
+    const frameFilePath = path.join(targetFolder, getFileNameForUnitInfoFrame(unitInfo, metadata.name, i + 1, metadata.frameRate));
     if (fs.existsSync(frameFilePath)) {
       console.log(`[${unitInfo.id}][${(new Date()).toLocaleTimeString()}] Skipping generating frame ${i + 1}/${metadata.numFrames} as [${frameFilePath}] already exists `);
       intermediateFiles.push(frameFilePath);
@@ -460,55 +505,57 @@ function initializePageInstanceWithUnitInfo(pageInstance, unitInfo, returnValues
       }
     }
   }
-  const fileNameFormat = getFileNameForUnitInfoFrame(unitInfo, metadata.name, 0, metadata.frameRate).replace('-F0000-', '-F%04d-');
-  const frameFileNameFormatWithPath = path.join(normalizedTempFolder, fileNameFormat);
-  const gifPath = path.join(path.normalize(argv.gifpath), getFileNameForUnitInfo(unitInfo, metadata.name));
-  const ffmpegPath = path.normalize(argv.absolutepathtoffmpeg);
-  console.log(`[${unitInfo.id}] Saving animation`, gifPath);
-  if (renderGif) {
-    await runCommand([
-      ffmpegPath,
-      `-i ${frameFileNameFormatWithPath}`,
-      unitInfo.backgroundColor ? '-gifflags 0' : '-gifflags 2',
-      `-filter_complex`,
-      [
-        `[0:v]\\ fps=${metadata.frameRate},split\\ [a][b];`,
-        `[a]\\ palettegen${unitInfo.backgroundColor ? '' : `=stats_mode=single`}\\ [p];`,
-        `[b][p]\\ paletteuse${unitInfo.backgroundColor ? '=alpha_threshold=0': `=dither=floyd_steinberg:alpha_threshold=100:new=1`}`,
-      ].join(''),
-      gifPath,
-    ].join(' '));
-  }
+  if (!outputSpritesheets) {
+    const fileNameFormat = getFileNameForUnitInfoFrame(unitInfo, metadata.name, 0, metadata.frameRate).replace('-F0000-', '-F%04d-');
+    const frameFileNameFormatWithPath = path.join(targetFolder, fileNameFormat);
+    const gifPath = path.join(path.normalize(argv.gifpath), getFileNameForUnitInfo(unitInfo, metadata.name));
+    const ffmpegPath = path.normalize(argv.absolutepathtoffmpeg);
+    console.log(`[${unitInfo.id}] Saving animation`, gifPath);
+    if (renderGif) {
+      await runCommand([
+        ffmpegPath,
+        `-i ${frameFileNameFormatWithPath}`,
+        unitInfo.backgroundColor ? '-gifflags 0' : '-gifflags 2',
+        `-filter_complex`,
+        [
+          `[0:v]\\ fps=${metadata.frameRate},split\\ [a][b];`,
+          `[a]\\ palettegen${unitInfo.backgroundColor ? '' : `=stats_mode=single`}\\ [p];`,
+          `[b][p]\\ paletteuse${unitInfo.backgroundColor ? '=alpha_threshold=0': `=dither=floyd_steinberg:alpha_threshold=100:new=1`}`,
+        ].join(''),
+        gifPath,
+      ].join(' '));
+    }
 
-  if (!unitInfo.backgroundColor) {
-    await runCommand([
-      ffmpegPath,
-      `-framerate ${metadata.frameRate}`, // fps for input files
-      `-i ${frameFileNameFormatWithPath}`,
-      `-r ${metadata.frameRate}`, // fps for apng
-      '-plays 0',
-      '-vf setpts=PTS-STARTPTS',
-      '-f apng',
-      '-y', // override existing PNG if GIF is recreated
-      gifPath.replace('.gif', '.png'),
-    ].join(' '));
+    if (!unitInfo.backgroundColor) {
+      await runCommand([
+        ffmpegPath,
+        `-framerate ${metadata.frameRate}`, // fps for input files
+        `-i ${frameFileNameFormatWithPath}`,
+        `-r ${metadata.frameRate}`, // fps for apng
+        '-plays 0',
+        '-vf setpts=PTS-STARTPTS',
+        '-f apng',
+        '-y', // override existing PNG if GIF is recreated
+        gifPath.replace('.gif', '.png'),
+      ].join(' '));
 
-    // APNG -> WEBP
-    // await runCommand([
-    //   ffmpegPath, // actually "magick"
-    //   '-dispose previous',
-    //   `APNG:${gifPath.replace('.gif', '.png')}`,
-    //   // `${frameFileNameFormatWithPath.slice(0, frameFileNameFormatWithPath.indexOf('-F%04d-'))}-*.png`,
-    //   '-define webp:lossless=true',
-    //   // `-delay ${metadata.frameRate / 60}`,
-    //   // '-loop 0',
-    //   gifPath.replace('.gif', '.webp'),
-    // ].join(' '));
-  }
+      // APNG -> WEBP
+      // await runCommand([
+      //   ffmpegPath, // actually "magick"
+      //   '-dispose previous',
+      //   `APNG:${gifPath.replace('.gif', '.png')}`,
+      //   // `${frameFileNameFormatWithPath.slice(0, frameFileNameFormatWithPath.indexOf('-F%04d-'))}-*.png`,
+      //   '-define webp:lossless=true',
+      //   // `-delay ${metadata.frameRate / 60}`,
+      //   // '-loop 0',
+      //   gifPath.replace('.gif', '.webp'),
+      // ].join(' '));
+    }
 
-  console.log(`[${unitInfo.id}] Cleaning up ${intermediateFiles.length} intermediate files`);
-  for (const fileName of intermediateFiles) {
-    fs.rmSync(fileName);
+    console.log(`[${unitInfo.id}] Cleaning up ${intermediateFiles.length} intermediate files`);
+    for (const fileName of intermediateFiles) {
+      fs.rmSync(fileName);
+    }
   }
   return warnings;
 }
@@ -519,17 +566,38 @@ async function getAnimations (unitInfo) {
   const log = (...args) => console.log(`[${id}]`,...args);
   const { scalingInformationByFrameByPart, ...unitInfoToLog } = unitInfo;
   log({unitInfoToLog});
+  const outputSpritesheets = shouldOutputSpritesheets();
+  const originalCgs = { ...unitInfo.cgs };
+
+  if (outputSpritesheets && !fs.existsSync(`${argv.gifpath}/${getSheetFolderNameForUnitInfo(unitInfo)}`)) {
+    fs.mkdirSync(`${argv.gifpath}/${getSheetFolderNameForUnitInfo(unitInfo)}`);
+  }
 
   // check for existing files
   if (unitInfo.cgs) {
     let hasSkipped = false;
-    for(const type in unitInfo.cgs) {
+    let checkPathForCgsType = (type) => {
       const filepath = `${argv.gifpath}/${getFileNameForUnitInfo(unitInfo, type)}`;
       if (fs.existsSync(filepath)) {
         log(`Skipping ${type} as ${filepath} already exists`);
         delete unitInfo.cgs[type];
         hasSkipped = true;
       }
+    }
+    if (outputSpritesheets) {
+      checkPathForCgsType = (type) => {
+        // all or nothing for the folder
+        const filepath = `${argv.gifpath}/${getSheetFolderNameForUnitInfo(unitInfo, type)}`;
+        if (fs.existsSync(filepath)) {
+          log(`Skipping ${type} as ${filepath} already exists`);
+          delete unitInfo.cgs[type];
+          hasSkipped = true;
+        }
+      }
+    }
+
+    for (const type in unitInfo.cgs) {
+      checkPathForCgsType(type);
     }
 
     if (Object.keys(unitInfo.cgs).length === 0) {
@@ -552,7 +620,7 @@ async function getAnimations (unitInfo) {
   /**
    * @type {[AnimationMetadata[], string[]]}
    */
-  const [types, initializationWarnings] = await initializePageInstanceWithUnitInfo(page, unitInfo);
+  let [types, initializationWarnings] = await initializePageInstanceWithUnitInfo(page, unitInfo);
   console.timeEnd('render time');
 
   // generate gifs
@@ -563,48 +631,13 @@ async function getAnimations (unitInfo) {
     warnings.push({ initializationWarnings });
   }
   await types.reduce((acc, animationMetadata) => {
-    // const result = await page.evaluate(async ([pageType, backgroundColor]) => {
-    //   let errorArgs;
-    //   const originalConsoleError = window.console.error;
-    //   const handleError = function(...args) {
-    //     originalConsoleError.apply(this, args);
-    //     errorArgs = args;
-    //     throw new Error(...args);
-    //   };
-    //   window.console.error = handleError;
-    //   window.addEventListener('error', handleError);
-    //   /* global GIF app */
-    //   console.log('generating gif', pageType, backgroundColor);
-    //   const gif = await app.frameMaker.toGif({
-    //     spritesheets: app._spritesheets,
-    //     animationName: pageType,
-    //     GifClass: GIF,
-    //     backgroundColor,
-    //     useTransparency: !backgroundColor,
-    //     cacheNewCanvases: false,
-    //     onProgressUpdate: (amt) => {
-    //       console.log(`[${pageType}] Creating GIF [${(amt * 100).toFixed(2)}%]`);
-    //     }
-    //   });
-    //   window.console.error = originalConsoleError;
-    //   window.removeEventListener('error', handleError);
-    //   if (errorArgs) {
-    //     throw new Error(...errorArgs);
-    //   }
-    //   console.log('finished generating gif', gif, pageType);
-    //   return gif;
-    // }, [type, unitInfo.backgroundColor]);
-
-    // const path = `${argv.gifpath}/${getFileNameForUnitInfo(unitInfo, type)}`;
-    // log('Saving GIF', path);
-    // return base64BlobToFile(result.blob, path);
     const hasLargeCanvas = (animationMetadata.width * animationMetadata.height > 1_000_000) || (animationMetadata.width * animationMetadata.height * animationMetadata.numFrames > 100_000_000);
     const hasManyParts = animationMetadata.partCountByFrameIndex.some((count) => count > 40);
     const useFfmpeg = argv.forceffmpeg || hasLargeCanvas || hasManyParts || animationMetadata.numFrames > 50;
     return acc.then(async () => {
       const pageInstance = await getPageInstance();
       const warningsForAnimation = await (!useFfmpeg
-        ? generateGifThroughPage(animationMetadata, unitInfo, pageInstance)
+        ? generateAnimationThroughPage(animationMetadata, unitInfo, pageInstance)
         : generateAnimationThroughFfmpeg(animationMetadata, unitInfo)
       );
       if (warningsForAnimation.length > 0) {
@@ -624,6 +657,21 @@ async function getAnimations (unitInfo) {
       }
     });
   }, Promise.resolve());
+
+  if (outputSpritesheets) {
+    if (Object.keys(originalCgs).length !== types.length) {
+      // guarantee that animation JSON will have all animation entries even if the sheet already exists
+      [types] = await initializePageInstanceWithUnitInfo(page, { ...unitInfo, cgs: originalCgs });
+    }
+    const animationJsonEntries = types.map((animationMetadata) => ({
+      ...animationMetadata.sheetMetadata,
+      name: animationMetadata.name,
+      filename: getSheetFileNameForUnitInfo(unitInfo, animationMetadata.name)
+    }));
+    const animationJsonPath = `${argv.gifpath}/${getSheetFolderNameForUnitInfo(unitInfo)}/animation.json`;
+    log(`Writing animation JSON to [${animationJsonPath}]`);
+    fs.writeFileSync(animationJsonPath, JSON.stringify(animationJsonEntries, null, '\t'), { encoding: 'utf8' });
+  }
 
   // await Promise.all(gifPromises);
   console.timeEnd('GIF creation time');
@@ -691,7 +739,7 @@ async function start() {
     console.log(`Writing errors to [${errorFileName}]`);
     fs.writeFileSync(errorFileName, JSON.stringify({
       args: argv,
-      errors: results.errors.map(({ err, unit }) => ({ err: `${err}`, unit })),
+      errors: results.errors.map(({ err, unit }) => ({ err: `${err}`, unit, errObject: err })),
     }, null, '\t'), { encoding: 'utf8' });
   }
   if (results.warnings.length > 0) {

@@ -651,6 +651,18 @@ var App = (function () {
       });
       return [factorWithSmallestDifference, number / factorWithSmallestDifference]
     }
+    getSheetMetadata(animationEntry) {
+      const numFrames = animationEntry.frames.length;
+      let [verticalFrameCount, horizontalFrameCount] = this._findFactorsWithSmallestDifference(numFrames);
+      if (Math.abs(verticalFrameCount - horizontalFrameCount) === numFrames - 1 && numFrames >= 7) {
+        [verticalFrameCount, horizontalFrameCount] = this._findFactorsWithSmallestDifference(numFrames + 1);
+      }
+      return {
+        horizontalFrameCount,
+        verticalFrameCount,
+        delays: animationEntry.frames.map((e) => e.frameDelay)
+      }
+    }
     async toSheet({
       spritesheets = [],
       animationName = 'name',
@@ -667,11 +679,9 @@ var App = (function () {
       }
       if (!animationEntry.sheet) {
         const hasOnProgressUpdateFunction = typeof onProgressUpdate === 'function';
+        const sheetMetadata = this.getSheetMetadata(animationEntry);
+        const { verticalFrameCount, horizontalFrameCount } = sheetMetadata;
         const numFrames = animationEntry.frames.length;
-        let [verticalFrameCount, horizontalFrameCount] = this._findFactorsWithSmallestDifference(numFrames);
-        if (Math.abs(verticalFrameCount - horizontalFrameCount) === numFrames - 1 && numFrames >= 7) {
-          [verticalFrameCount, horizontalFrameCount] = this._findFactorsWithSmallestDifference(numFrames + 1);
-        }
         let outputCanvas;
         let outputCanvasContext;
         let xStart = 0;
@@ -704,11 +714,17 @@ var App = (function () {
             yStart += originalFrame.height;
           }
         }
+        const blob = await new Promise((resolve, reject) => {
+          try {
+            outputCanvas.toBlob((localBlob) => resolve(localBlob));
+          } catch (e) {
+            reject(e);
+          }
+        });
         animationEntry.sheet = {
           url: outputCanvas.toDataURL("image/png"),
-          horizontalFrameCount,
-          verticalFrameCount,
-          delays: animationEntry.frames.map((e) => e.frameDelay)
+          blob: await this._blobToBase64(blob),
+          ...sheetMetadata,
         };
       }
       return animationEntry.sheet;
@@ -1067,12 +1083,10 @@ var App = (function () {
     get frameMaker () {
       return this._frameMaker;
     }
-    async generateAnimationMetadataForSheet(currentAnimation = this._currentAnimation) {
-      if (!this._vueData.outputSheetInfo[currentAnimation]) {
-        await this.generateOutputSheet(currentAnimation);
-      }
-      const { horizontalFrameCount, verticalFrameCount, delays } = this._vueData.outputSheetInfo[currentAnimation];
-      const { bounds: animationBounds } = this._frameMaker.getAnimation(currentAnimation);
+    generateAnimationMetadataForSheet(currentAnimation = this._currentAnimation) {
+      const animationEntry = this._frameMaker.getAnimation(currentAnimation);
+      const { bounds: animationBounds } = animationEntry;
+      const { horizontalFrameCount, verticalFrameCount, delays } = this._frameMaker.getSheetMetadata(animationEntry);
       return {
         name: currentAnimation,
         filename: `${currentAnimation}.png`,

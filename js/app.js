@@ -424,12 +424,10 @@ export default class App {
     return this._frameMaker;
   }
 
-  async generateAnimationMetadataForSheet(currentAnimation = this._currentAnimation) {
-    if (!this._vueData.outputSheetInfo[currentAnimation]) {
-      await this.generateOutputSheet(currentAnimation);
-    }
-    const { horizontalFrameCount, verticalFrameCount, delays } = this._vueData.outputSheetInfo[currentAnimation];
-    const { bounds: animationBounds } = this._frameMaker.getAnimation(currentAnimation);
+  generateAnimationMetadataForSheet(currentAnimation = this._currentAnimation) {
+    const animationEntry = this._frameMaker.getAnimation(currentAnimation);
+    const { bounds: animationBounds } = animationEntry;
+    const { horizontalFrameCount, verticalFrameCount, delays } = this._frameMaker.getSheetMetadata(animationEntry);
     return {
       name: currentAnimation,
       filename: `${currentAnimation}.png`,
