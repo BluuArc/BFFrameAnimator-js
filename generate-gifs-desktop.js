@@ -232,7 +232,7 @@ function initializePageInstanceWithUnitInfo(pageInstance, unitInfo, returnValues
             const cggFrame = frameMaker._frames[cgsFrame.frameIndex];
             return cggFrame.parts.length;
           });
-          const sheetMetadata = frameMaker.getSheetMetadata(frameMaker.getAnimation(name));
+          const sheetMetadata = app.generateAnimationMetadataForSheet(name);
           return currentMapping.concat({
             name,
             numFrames: animation.frames.length,
