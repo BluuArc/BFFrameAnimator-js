@@ -1,11 +1,13 @@
-const puppeteer = require('puppeteer');
 const fs = require('fs');
-const rp = require('request-promise');
 const execa = import('execa');
 const path = require('path');
 
 const argv = require('./get-cli-arguments');
 const unitInput = require('./advanced-units-input'); // read from advanced-units-input.js
+const { base64BlobToFile, ensurePathExists, canReachHref } = require('./desktop-js/utils');
+const { createPuppeteerWrapper } = require('./desktop-js/puppeteer-utils');
+
+const { getPageInstance: getPageInstanceInWrapper, closeConnection, refreshActivePageInstance } = createPuppeteerWrapper();
 
 /**
  * @typedef AnimationMetadata
@@ -29,60 +31,14 @@ const unitInput = require('./advanced-units-input'); // read from advanced-units
  * @property {number[]} delays
  */
 
-let browserInstance, pageInstance;
-
 let count = 0;
 
-function base64BlobToFile (base64Blob, filename = 'result.gif') {
-  return new Promise((fulfill, reject) => {
-    const decodedBlob = Buffer.from(base64Blob, 'base64');
-    fs.writeFile(filename, decodedBlob, err => {
-      if (err) {
-        reject(err);
-      } else {
-        fulfill();
-      }
-    });
-  });
-}
-
 function serverIsActive () {
-  return rp(`http://localhost:${argv.port}`).then(() => true).catch(() => false);
+  return canReachHref(`http://localhost:${argv.port}`);
 }
 
 async function getPageInstance () {
-  if (!browserInstance) {
-    let puppeteerArgs = { headless: !argv.notheadless };
-    if (!puppeteerArgs.headless) {
-      puppeteerArgs.args = ['--enable-gpu-rasterization', '--window-size=500,500'];
-      puppeteerArgs.defaultViewport = { width: 500, height: 500 };
-    }
-    browserInstance = await puppeteer.launch(puppeteerArgs);
-  }
-
-  if (!pageInstance) {
-    pageInstance = await browserInstance.newPage();
-    await pageInstance.goto(`http://localhost:${argv.port}`);
-  }
-
-  return pageInstance;
-}
-
-async function closeConnection () {
-  if (browserInstance || pageInstance) {
-    await getPageInstance();
-    await browserInstance.close();
-    pageInstance = null;
-    browserInstance = null;
-    // wait 1s for browser to fully clear itself from memory?
-    await new Promise((resolve) => { setTimeout(() => resolve(), 1_000); });
-  }
-  return;
-}
-
-async function refreshActivePageInstance() {
-  const localPageInstance = await getPageInstance();
-  await localPageInstance.goto(`http://localhost:${argv.port}`);
+  return getPageInstanceInWrapper(`http://localhost:${argv.port}`, { headless: !argv.notheadless })
 }
 
 const getFileNameForUnitInfo = (unitInfo, cgsType) => `${unitInfo.type || 'unit'}_${unitInfo.id}_${cgsType}${unitInfo.backgroundColor ? `_bg-${unitInfo.backgroundColor}` : ''}.gif`;
@@ -269,9 +225,7 @@ function initializePageInstanceWithUnitInfo(pageInstance, unitInfo, returnValues
     ? path.join(argv.gifpath, getSheetFolderNameForUnitInfo(unitInfo, metadata.name))
     : path.normalize(argv.tempfolder);
 
-    if (!fs.existsSync(targetFolder)) {
-      fs.mkdirSync(targetFolder);
-    }
+  ensurePathExists(targetFolder);
 
   // start with fresh instance for larger animations
   // await closeConnection();
@@ -569,8 +523,8 @@ async function getAnimations (unitInfo) {
   const outputSpritesheets = shouldOutputSpritesheets();
   const originalCgs = { ...unitInfo.cgs };
 
-  if (outputSpritesheets && !fs.existsSync(`${argv.gifpath}/${getSheetFolderNameForUnitInfo(unitInfo)}`)) {
-    fs.mkdirSync(`${argv.gifpath}/${getSheetFolderNameForUnitInfo(unitInfo)}`);
+  if (outputSpritesheets) {
+    ensurePathExists(`${argv.gifpath}/${getSheetFolderNameForUnitInfo(unitInfo)}`);
   }
 
   // check for existing files
@@ -711,9 +665,7 @@ async function start() {
   // console.log('Received args',argv);
 
   console.log('Checking existence of gif folder:', argv.gifpath);
-  if (!fs.existsSync(argv.gifpath)) {
-    fs.mkdirSync(argv.gifpath);
-  }
+  ensurePathExists(argv.gifpath);
 
   if (unitInput.length === 0) {
     throw Error('No input specified');
