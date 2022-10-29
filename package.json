@@ -9,6 +9,7 @@
     "build": "rollup --config rollup.config.js",
     "dev": "nodemon --exec \"npm run clean-start\" --config nodemon.json",
     "generate-gifs": "node generate-gifs-desktop.js",
+    "generate-godot-animations": "node generate-godot-animations.js",
     "heroku-postbuild": "echo Skip build on Heroku"
   },
   "author": "Joshua Castor",

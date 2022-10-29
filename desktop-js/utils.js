@@ -1,5 +1,6 @@
 const fs = require('fs');
 const rp = require('request-promise');
+const path = require("path");
 
 /**
  * @param {string} base64Blob
@@ -22,10 +23,16 @@ function base64BlobToFile (base64Blob, filename = 'result.gif') {
 /**
  * @param {string} folderPath
  */
-async function ensurePathExists (folderPath) {
-	if (!fs.existsSync(folderPath)) {
-    fs.mkdirSync(folderPath);
-  }
+function ensurePathExists (folderPath) {
+	const foldersToCheck = folderPath.split(path.sep);
+	const checkedFolders = [];
+	foldersToCheck.forEach((folderName) => {
+		const currentFolderPath = path.join(...checkedFolders, folderName)
+		if (!fs.existsSync(currentFolderPath)) {
+			fs.mkdirSync(currentFolderPath);
+		}
+		checkedFolders.push(folderName);
+	});
 }
 
 /**

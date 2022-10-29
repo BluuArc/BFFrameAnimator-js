@@ -17,6 +17,9 @@ export default class App {
      */
     this._targetCanvas = null;
 
+    /**
+     * @type {HTMLImageElement[]}
+     */
     this._spritesheets = [];
     this._currentAnimation = null;
     this._raf = null;
