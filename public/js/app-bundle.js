@@ -123,27 +123,29 @@ var App = (function () {
         gl: 'https://dv5bk1m8igv7v.cloudfront.net/asset/21900/content/',
         jp: 'http://cdn.android.brave.a-lim.jp/',
       };
-      const filepaths = {
-        cgg: 'unit/cgg/',
-        cgs: 'unit/cgs/',
-        anime: 'unit/img/'
-      };
-      const animationTypes = ['idle', 'atk', 'move', server === 'eu' && 'skill'].filter(v => v);
       let baseUrl = serverUrls[server];
       if (!baseUrl) {
         throw new Error(`Unknown server [${server}]`);
       } else if (server === 'gl' && cdnVersion) {
         baseUrl = `https://dv5bk1m8igv7v.cloudfront.net/asset/${cdnVersion}/content/`;
       }
+      return FrameMaker.fromBraveFrontierUnitOnServer(id, baseUrl, doTrim);
+    }
+    static async fromBraveFrontierUnitOnServer (id = '10011', baseHref = '', doTrim = false) {
+      const filepaths = {
+        cgg: 'unit/cgg/',
+        cgs: 'unit/cgs/',
+        anime: 'unit/img/'
+      };
       const input = {
         anime: [
-          [baseUrl, filepaths.anime, `unit_anime_${id}.png`].join(''),
+          [baseHref, filepaths.anime, `unit_anime_${id}.png`].join(''),
         ],
-        cgg: [baseUrl, filepaths.cgg, `unit_cgg_${id}.csv`].join(''),
+        cgg: [baseHref, filepaths.cgg, `unit_cgg_${id}.csv`].join(''),
         cgs: {},
       };
-      animationTypes.forEach(type => {
-        input.cgs[type] = [baseUrl, filepaths.cgs, `unit_${type}_cgs_${id}.csv`].join('');
+      ['idle', 'atk', 'move'].forEach(type => {
+        input.cgs[type] = [baseHref, filepaths.cgs, `unit_${type}_cgs_${id}.csv`].join('');
       });
       const { spritesheets, maker } = await FrameMaker.fromAdvancedInput(input, doTrim);
       return {

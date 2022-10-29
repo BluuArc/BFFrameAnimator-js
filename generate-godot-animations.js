@@ -1,7 +1,7 @@
 const path = require("path");
 const fs = require('fs');
 const argv = require('./get-cli-arguments');
-const { canReachHref, ensurePathExists, base64BlobToFile } = require('./desktop-js/utils');
+const { canReachHref, ensurePathExists, base64BlobToFile, downloadFile } = require('./desktop-js/utils');
 const { createPuppeteerWrapper } = require('./desktop-js/puppeteer-utils');
 /**
  * @type {UnitInfo[]}
@@ -21,6 +21,8 @@ const { getPageInstance: getPageInstanceInWrapper, closeConnection, refreshActiv
  * @property {boolean} outputApng
  * @property {boolean} doTrim
  * @property {string} backgroundColor
+ * @property {string?} server
+ * @property {string?} serverHref
  */
 
 /**
@@ -146,6 +148,10 @@ function initializePageInstanceWithUnitInfo(pageInstance, unitInfo) {
 			let spriteSheets;
 			if (pageUnitInfo.server) { // is simplified input
 				const { maker, spritesheet } = await FrameMaker.fromBraveFrontierUnit(pageUnitInfo.id, pageUnitInfo.server, !!pageUnitInfo.doTrim);
+				frameMaker = maker;
+				spriteSheets = [spritesheet];
+			} else if (pageUnitInfo.serverHref) {
+				const { maker, spritesheet } = await FrameMaker.fromBraveFrontierUnitOnServer(pageUnitInfo.id, pageUnitInfo.serverHref, !!pageUnitInfo.doTrim);
 				frameMaker = maker;
 				spriteSheets = [spritesheet];
 			} else { // is advanced unit
@@ -362,13 +368,36 @@ async function generateAnimationThroughPage (animationMetadata, unitInfo, pageIn
 /**
  * @param {UnitInfo} unitInfo
  */
+async function getIllustrationsForUnit (unitInfo) {
+	if (!unitInfo.serverHref) {
+		console.warn(`[${unitInfo.id}] Skipping getting illustrations. Must specify 'serverHref'.`);
+		return;
+	}
+	await [
+		[`unit_ills_battle_${unitInfo.id}.png`, `unit_${unitInfo.id}_ills_battle.png`],
+		[`unit_ills_thum_${unitInfo.id}.png`, `unit_${unitInfo.id}_ills_thum.png`],
+		[`unit_ills_full_${unitInfo.id}.png`, `unit_${unitInfo.id}_ills_full.png`],
+	].reduce((acc, [serverFileName, outputFileName]) => {
+		return acc.then(() => {
+			const serverPath = `${unitInfo.serverHref}unit/img/${serverFileName}`;
+			const outputPath = path.join(argv.gifpath, getSheetFolderNameForUnitInfo(unitInfo), outputFileName);
+			console.log(`[${unitInfo.id}] Fetching image`, serverFileName);
+			return downloadFile(serverPath, outputPath);
+		});
+	}, Promise.resolve());
+}
+
+/**
+ * @param {UnitInfo} unitInfo
+ */
 async function createAnimationsForUnit (unitInfo) {
 	const id = unitInfo.id;
 	const log = (...args) => console.log(`[${id}]`, ...args);
 
 	ensurePathExists(path.join(argv.gifpath, getSheetFolderNameForUnitInfo(unitInfo)));
 
-	if (Object.keys(unitInfo.cgs).length === 0) {
+	// the cgs property can be unset when using the simplified input
+	if (unitInfo.cgs && Object.keys(unitInfo.cgs).length === 0) {
 		log('Skipping animation generation as cgs portion is empty');
 		throw new Error(`cgs field is empty for entry ${id}`);
 	}
@@ -422,6 +451,12 @@ async function createAnimationsForUnit (unitInfo) {
 	// TODO: handle frame-based output
 	await generateGodotAnimationForSpritesheetOutput(unitInfo, animationMetadataEntries);
 	console.timeEnd('text file generation');
+
+	if (unitInfo.serverHref) {
+		console.time('image fetching');
+		await getIllustrationsForUnit(unitInfo);
+		console.timeEnd('image fetching');
+	}
 	console.timeEnd('animation generation');
 
 	// reset the browser every so often to avoid hangups
@@ -475,7 +510,7 @@ async function start() {
   if (results.errors.length > 0) {
     console.log('Encountered errors with the following units');
     results.errors.forEach(e => {
-      console.log(e.err, `\n${e.unit.id} ${Object.keys(e.unit.cgs)}`);
+      console.log(e.err, `\n${e.unit.id} ${e.unit.cgs ? Object.keys(e.unit.cgs) : JSON.stringify(e.unit)}`);
     });
     const errorFileName = `report-errors-${currentTime}.json`;
     console.log(`Writing errors to [${errorFileName}]`);

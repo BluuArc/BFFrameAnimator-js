@@ -20,6 +20,24 @@ function base64BlobToFile (base64Blob, filename = 'result.gif') {
 	});
 }
 
+function downloadFile (href = '', filename = '') {
+	return rp({
+		uri: href,
+		encoding: null, // return data as a buffer
+	})
+		.then((data) => {
+			return new Promise((fulfill, reject) => {
+				fs.writeFile(filename, data, err => {
+					if (err) {
+						reject(err);
+					} else {
+						fulfill();
+					}
+				});
+			});
+		});
+}
+
 /**
  * @param {string} folderPath
  */
@@ -46,4 +64,5 @@ module.exports = {
 	base64BlobToFile,
 	ensurePathExists,
 	canReachHref,
+	downloadFile,
 };
