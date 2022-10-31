@@ -108,7 +108,7 @@ const getFileNameForUnitInfoFrame = (unitInfo, cgsType, frameIndex, delay) => `$
  * @param {string?} cgsType
  */
 const getSheetFolderNameForUnitInfo = (unitInfo, cgsType) => path.join(...[
-	"sheets",
+	"assets-animations",
   `${unitInfo.type || 'unit'}_${unitInfo.id}`,
   cgsType && `${cgsType}${unitInfo.backgroundColor ? `_bg-${unitInfo.backgroundColor}` : ''}`
 ].filter(v => !!v));
@@ -132,11 +132,11 @@ const replaceBackslashes = (str = '') => str.replace(/\\/g, '/');
  * @param {UnitInfo} unitInfo
  * @returns {Promise<[AnimationMetadata[], any[]]>}
  */
-function initializePageInstanceWithUnitInfo(pageInstance, unitInfo) {
+function initializePageInstanceWithUnitInfo(pageInstance, unitInfo, returnValues = true) {
 	/**
 	 * @param {UnitInfo} pageUnitInfo
 	 */
-	const pageFunction = async (pageUnitInfo) => {
+	const pageFunction = async ([pageUnitInfo, shouldReturnMapping]) => {
 			window.requestIdleCallback = (fn) => window.setTimeout(() => fn(), 0);
 			/**
 			 * @type {import('./js/FrameMaker/index').default}
@@ -163,7 +163,7 @@ function initializePageInstanceWithUnitInfo(pageInstance, unitInfo) {
 			/**
 			 * @type {import("./js/app").default}
 			 */
-			let windowApp = window.app;
+			const windowApp = window.app;
 			windowApp._frameMaker = frameMaker;
     	windowApp._spritesheets = spriteSheets;
 
@@ -171,51 +171,53 @@ function initializePageInstanceWithUnitInfo(pageInstance, unitInfo) {
 			/**
 			 * @type {AnimationMetadata[]}
 			 */
-			const animationNameToInfoMapping = await animationNames.reduce((acc, name) => {
-				return acc.then(async (currentMapping) => {
-					const animation = frameMaker.getAnimation(name);
-					const firstFrame = await frameMaker.getFrame({
-						spritesheets: spriteSheets,
-						animationName: name,
-						animationIndex: 0,
-						cacheNewCanvases: false,
+			let result = [];
+			if (shouldReturnMapping) {
+				result = await animationNames.reduce((acc, name) => {
+					return acc.then(async (currentMapping) => {
+						const animation = frameMaker.getAnimation(name);
+						const firstFrame = await frameMaker.getFrame({
+							spritesheets: spriteSheets,
+							animationName: name,
+							animationIndex: 0,
+							cacheNewCanvases: false,
+						});
+						const firstFrameDelay = +firstFrame.dataset.delay;
+						const allFrameDelaysAreIdentical = animation.frames.every((f) => f.frameDelay === firstFrameDelay);
+						const largestFrameDelay = Math.max(...animation.frames.map((f) => f.frameDelay));
+						let frameRate = 60;
+						if (allFrameDelaysAreIdentical && largestFrameDelay < 10) {
+							frameRate = 60 / largestFrameDelay;
+						}
+						const partCountByFrameIndex = animation.frames.map((cgsFrame, index) => {
+							const cggFrame = frameMaker._frames[cgsFrame.frameIndex];
+							return cggFrame.parts.length;
+						});
+						const sheetMetadata = app.generateAnimationMetadataForSheet(name);
+						return currentMapping.concat({
+							name,
+							numFrames: animation.frames.length,
+							width: firstFrame.width,
+							height: firstFrame.height,
+							bounds: animation.bounds,
+							frameRate,
+							partCountByFrameIndex,
+							sheetMetadata,
+						});
 					});
-					const firstFrameDelay = +firstFrame.dataset.delay;
-          const allFrameDelaysAreIdentical = animation.frames.every((f) => f.frameDelay === firstFrameDelay);
-          const largestFrameDelay = Math.max(...animation.frames.map((f) => f.frameDelay));
-          let frameRate = 60;
-          if (allFrameDelaysAreIdentical && largestFrameDelay < 10) {
-            frameRate = 60 / largestFrameDelay;
-          }
-					const partCountByFrameIndex = animation.frames.map((cgsFrame, index) => {
-            const cggFrame = frameMaker._frames[cgsFrame.frameIndex];
-            return cggFrame.parts.length;
-          });
-					const sheetMetadata = app.generateAnimationMetadataForSheet(name);
-          return currentMapping.concat({
-            name,
-            numFrames: animation.frames.length,
-            width: firstFrame.width,
-            height: firstFrame.height,
-            bounds: animation.bounds,
-            frameRate,
-            partCountByFrameIndex,
-            sheetMetadata,
-          });
-				});
-			}, Promise.resolve([]));
-			return animationNameToInfoMapping;
+				}, Promise.resolve([]));
+			}
+			return result;
 	};
-	return evaluateOnPageWithErrorHandling(pageInstance, pageFunction, unitInfo);
+	return evaluateOnPageWithErrorHandling(pageInstance, pageFunction, [unitInfo, returnValues]);
 }
 
 /**
  * @param {UnitInfo} unitInfo
  * @param {AnimationMetadata[]} animationMetadataEntries
- * @param {import("puppeteer").Page} pageInstance
  */
 function generateGodotAnimationForSpritesheetOutput(unitInfo, animationMetadataEntries) {
-	const godotSheetFolderPath = replaceBackslashes(getSheetFolderNameForUnitInfo(unitInfo)).replace("sheets", "res://assets/animations");
+	const godotSheetFolderPath = replaceBackslashes(getSheetFolderNameForUnitInfo(unitInfo)).replace("assets-animations", "res://assets/animations");
 	const godotAnimationFolderPath = replaceBackslashes(getGodotAnimationFolderPathForUnitInfo(unitInfo));
 	const outputFolderPath = path.join(argv.gifpath, getGodotAnimationFolderPathForUnitInfo(unitInfo));
 	ensurePathExists(outputFolderPath);
@@ -285,7 +287,7 @@ func _ready():
 		});
 	});
 
-	// number of resources (external, individual frames and 1 for SpriteFrames) + 1
+	// number of resources (external, individual frames and 1 for SpriteFrames) + 1 (gd_scene?)
 	const loadSteps = externalResources.length + individualFrames.length + 2;
 	const spriteFramesId = individualFrames.length + 1;
 	const spriteControllerSceneContents = `[gd_scene load_steps=${loadSteps} format=2]
@@ -329,12 +331,111 @@ script = ExtResource( ${externalResources.findIndex((e) => e.path === `res://${g
 }
 
 /**
+ * @param {UnitInfo} unitInfo
+ * @param {AnimationMetadata[]} animationMetadataEntries
+ */
+function generateGodotAnimationForIndividualFrameOutput(unitInfo, animationMetadataEntries) {
+	const godotAssetFolderPath = replaceBackslashes(getSheetFolderNameForUnitInfo(unitInfo)).replace("assets-animations", "res://assets/animations");
+	const godotAnimationFolderPath = replaceBackslashes(getGodotAnimationFolderPathForUnitInfo(unitInfo));
+	const outputFolderPath = path.join(argv.gifpath, getGodotAnimationFolderPathForUnitInfo(unitInfo));
+	ensurePathExists(outputFolderPath);
+	let spriteNodeName = `Unit${unitInfo.id}Sprite`;
+	if (unitInfo.type && /^[a-zA-Z]/.test(unitInfo.type[0])) {
+		spriteNodeName = `${unitInfo.type[0].toUpperCase()}${unitInfo.type.slice(1)}${unitInfo.id}Sprite`;
+	}
+	const spriteScriptContents = `extends BaseSprite
+func _ready():
+	set_animation_json("${godotAssetFolderPath}/animation.json")
+`;
+	const spriteControllerScriptContents = `extends BaseSpriteController
+func _ready():
+	set_sprite($${spriteNodeName})
+`;
+	/**
+	 * @type {Array<{ path: string, type: string }>}
+	 */
+	let externalResources = [];
+	/**
+	 * @type {{ [animationName: string]: string[] }}
+	 */
+	const frameFilenamesForAnimationName = {};
+	const baseFileName = path.basename(outputFolderPath); // base file name is identical to name of output folder
+	animationMetadataEntries.forEach(({ name: animationName }) => {
+		const frameOutputFolder = path.join(argv.gifpath, getSheetFolderNameForUnitInfo(unitInfo, animationName));
+		const godotFrameFolderPath = replaceBackslashes(getSheetFolderNameForUnitInfo(unitInfo, animationName)).replace("assets-animations", "res://assets/animations")
+		const frameFileNames = fs.readdirSync(frameOutputFolder).sort();
+		frameFilenamesForAnimationName[animationName] = frameFileNames;
+		externalResources = externalResources.concat(frameFileNames.map((fileName) => ({
+			path: `${godotFrameFolderPath}/${fileName}`,
+			type: "Texture"
+		})));
+	});
+	externalResources = externalResources.concat([
+		{
+			path: `res://${godotAnimationFolderPath}/${baseFileName}_sprite.gd`,
+			type: "Script"
+		},
+		{
+			path: `res://${godotAnimationFolderPath}/${baseFileName}_sprite_controller.gd`,
+			type: "Script"
+		},
+	]);
+
+	const spriteFrames = animationMetadataEntries.map(({ name: animationName }) => {
+		const frameFileNames = frameFilenamesForAnimationName[animationName];
+		return {
+			frames: frameFileNames.map((fileName) => `ExtResource( ${externalResources.findIndex((externalResource) => externalResource.path.endsWith(fileName)) + 1} )`), // IDs are 1-indexed
+			loop: animationName !== "atk",
+			name: animationName,
+			speed: "60.0", // TODO: grab from file name?
+		}
+	});
+
+	// number of resources (external resources and 1 for SpriteFrames) + 1 (gd_scene?)
+	const loadSteps = externalResources.length + 2;
+	const spriteFramesId = 1; // only 1 subresource
+	const spriteControllerSceneContents = `[gd_scene load_steps=${loadSteps} format=2]
+
+${externalResources.map((e, i) => `[ext_resource path="${e.path}" type="${e.type}" id=${i+1}]`).join("\n")}
+
+[sub_resource type="SpriteFrames" id=${spriteFramesId}]
+animations = [
+${spriteFrames.map((e) => `{
+		"frames": [ ${e.frames.join(", ")} ],
+		"loop": ${e.loop},
+		"name": "${e.name}",
+		"speed": ${e.speed}
+}`).join(",\n")}
+]
+
+[node name="${spriteNodeName}Controller" type="CanvasLayer"]
+script = ExtResource( ${externalResources.findIndex((e) => e.path === `res://${godotAnimationFolderPath}/${baseFileName}_sprite_controller.gd`) + 1} )
+
+[node name="${spriteNodeName}" type="AnimatedSprite" parent="."]
+frames = SubResource( ${spriteFramesId} )
+animation = "${animationMetadataEntries[0].name}"
+centered = false
+script = ExtResource( ${externalResources.findIndex((e) => e.path === `res://${godotAnimationFolderPath}/${baseFileName}_sprite.gd`) + 1} )
+`;
+
+	[
+		[spriteScriptContents, `${baseFileName}_sprite.gd`],
+		[spriteControllerScriptContents, `${baseFileName}_sprite_controller.gd`],
+		[spriteControllerSceneContents, `${baseFileName}_sprite_controller.tscn`],
+	].forEach(([contents, filename]) => {
+		const fileOutputPath = path.join(outputFolderPath, filename);
+		console.log(`[${unitInfo.id}] Saving ${fileOutputPath}`);
+		fs.writeFileSync(fileOutputPath, contents, { encoding: "utf8" });
+	});
+}
+
+/**
  * @param {AnimationMetadata} animationMetadata
  * @param {UnitInfo} unitInfo
  * @param {import("puppeteer").Page} pageInstance
  */
-async function generateAnimationThroughPage (animationMetadata, unitInfo, pageInstance) {
-	console.log(`[${unitInfo.id}] Using only page`);
+async function generateAnimationSheet (animationMetadata, unitInfo, pageInstance) {
+	console.log(`[${unitInfo.id}] Generating sprite sheet`);
 	const pageFunction = async ([animationName, backgroundColor]) => {
 		console.log('generating sheet', { animationName, backgroundColor });
 		/**
@@ -362,6 +463,208 @@ async function generateAnimationThroughPage (animationMetadata, unitInfo, pageIn
 	);
 	console.log(`[${unitInfo.id}] Saving sheet`, outputPath);
 	await base64BlobToFile(result.blob, outputPath);
+	return warnings;
+}
+
+/**
+ * @param {AnimationMetadata} animationMetadata
+ * @param {UnitInfo} unitInfo
+ */
+async function generateIndividualAnimationFrames (animationMetadata, unitInfo) {
+	const log = (...args) => console.log(`[${unitInfo.id}]`, ...args);
+	log(`[${unitInfo.id}] Generating individual frames`);
+	const warnings = [];
+	const targetFolder = path.join(argv.gifpath, getSheetFolderNameForUnitInfo(unitInfo, animationMetadata.name));
+	ensurePathExists(targetFolder);
+
+	/**
+	 * @type {import("puppeteer").Page}
+	 */
+  let localPageInstance;
+	let pixelsRenderedInPageInstance = 0;
+	const refreshBrowserInstanceWithUnitInfo = async () => {
+		log('Refreshing page instance');
+		await refreshActivePageInstance();
+		localPageInstance = await getPageInstance();
+		await initializePageInstanceWithUnitInfo(localPageInstance, { ...unitInfo, bound: animationMetadata.bounds }, false);
+		pixelsRenderedInPageInstance = 0;
+	};
+	// start with fresh instance for larger animations
+	await refreshBrowserInstanceWithUnitInfo();
+
+	const canvasSize = animationMetadata.width * animationMetadata.height;
+  const DEFAULT_PART_CHUNK_SIZE = 20;
+  const MAX_PIXELS_UPDATED_PER_FRAME_THRESHOLD = 10_000_000;
+	/**
+	 * @param {[AnimationMetadata, string?, number]} args
+	 */
+	const generateEntireFrame = async ([pageMetadata, backgroundColor, frameIndex]) => {
+		console.log('generating frame', pageMetadata, backgroundColor, frameIndex);
+		/**
+		 * @type {import("./js/app").default}
+		 */
+		 const windowApp = window.app;
+		 const originalFrame = await windowApp.frameMaker.getFrame({
+			spritesheets: windowApp._spritesheets,
+			animationName: pageMetadata.name,
+			animationIndex: frameIndex,
+			cacheNewCanvases: false,
+		 });
+		 let resultFrame = originalFrame;
+		 if (backgroundColor) {
+			resultFrame = windowApp.frameMaker.createFrameWithBackground(originalFrame, backgroundColor);
+		 }
+		 console.log('finished generating frame', pageMetadata);
+		 const blobAsBase64 = await new Promise((fulfill, reject) => {
+			resultFrame.toBlob((blob) => {
+				windowApp.frameMaker._blobToBase64(blob).then(fulfill, reject);
+			});
+		});
+		return {
+			blob: blobAsBase64,
+			delay: Math.floor(originalFrame.dataset.delay / 60 * 1000),
+		}
+	};
+	/**
+	 * @param {[AnimationMetadata, number, number, number]} args
+	 */
+	const generatePartialFrame = async ([pageMetadata, frameIndex, pagePartStartIndex, pagePartChunkSize]) => {
+		console.log('generating frame', pageMetadata, frameIndex);
+		/**
+		 * @type {import("./js/app").default}
+		 */
+		 const windowApp = window.app;
+		 const partialFrame = await windowApp.frameMaker.getFrame({
+			spritesheets: windowApp._spritesheets,
+			animationName: pageMetadata.name,
+			animationIndex: frameIndex,
+			cacheNewCanvases: false,
+			startingPartIndex: pagePartStartIndex,
+			numberOfPartsToRender: pagePartChunkSize,
+		 });
+		 console.log('finished generating frame', pageMetadata);
+		 const blobAsBase64 = await new Promise((fulfill, reject) => {
+			partialFrame.toBlob((blob) => {
+				windowApp.frameMaker._blobToBase64(blob).then(fulfill, reject);
+			});
+		});
+		return {
+			blob: blobAsBase64,
+			width: partialFrame.width,
+			height: partialFrame.height,
+			delay: Math.floor(originalFrame.dataset.delay / 60 * 1000),
+		};
+	};
+	/**
+	 * @param {[Array<{ blob: string, delay: number, width: number, height: number }>, string]} args
+	 */
+	const mergePartialFrames = async ([pageIntermediateBlobInfo, backgroundColor]) => {
+		console.log('generating frame', pageIntermediateBlobInfo, backgroundColor);
+		const resultFrame = document.createElement('canvas');
+		resultFrame.width = pageIntermediateBlobInfo[0].width;
+		resultFrame.height = pageIntermediateBlobInfo[0].height;
+		const resultFrameContext = resultFrame.getContext('2d');
+		if (backgroundColor) {
+			resultFrameContext.fillStyle = backgroundColor;
+			resultFrameContext.fillRect(0, 0, resultFrame.width, resultFrame.height);
+		}
+
+		for (const blobInfo of pageIntermediateBlobInfo) {
+			const imageForIntermediateFrame = await new Promise((fulfill, reject) => {
+				const image = new Image();
+				image.onload = () => fulfill(image);
+				image.onerror = image.onabort = reject;
+				image.src = `data:image/png;base64,${blobInfo.blob}`;
+			});
+			resultFrameContext.drawImage(imageForIntermediateFrame, 0, 0);
+		}
+
+		const blobAsBase64 = await new Promise((fulfill, reject) => {
+			resultFrame.toBlob((blob) => {
+				/**
+				 * @type {import("./js/app").default}
+				 */
+				const windowApp = window.app;
+				windowApp.frameMaker._blobToBase64(blob).then(fulfill, reject);
+			});
+		});
+
+		return {
+			blob: blobAsBase64,
+			delay: pageIntermediateBlobInfo[0].delay,
+		};
+	};
+	for (let i = 0; i < animationMetadata.numFrames; ++i) {
+		const logForFrame = (...args) => log(`[${(new Date()).toLocaleTimeString()}][Frame ${i + 1}/${animationMetadata.numFrames}]`, ...args);
+		const frameFilePath = path.join(targetFolder, getFileNameForUnitInfoFrame(unitInfo, animationMetadata.name, i + 1, animationMetadata.frameRate));
+		if (fs.existsSync(frameFilePath)) {
+			logForFrame(`Skipping generating frame as [${frameFilePath}] already exists`);
+		} else {
+			/**
+			 * @type {{ blob: string, delay: number }}
+			 */
+			let blobInfoForFrame;
+			let frameWarnings = [];
+			const estimatedPixelsUpdatedInCurrentFrame = animationMetadata.partCountByFrameIndex[i] * 0.25 * canvasSize;
+      const maxNumberOfPixelsUpdatedExceedsThreshold = estimatedPixelsUpdatedInCurrentFrame > MAX_PIXELS_UPDATED_PER_FRAME_THRESHOLD;
+			if (animationMetadata.partCountByFrameIndex[i] <= DEFAULT_PART_CHUNK_SIZE && !maxNumberOfPixelsUpdatedExceedsThreshold) {
+				// make entire frame in one go
+				[blobInfoForFrame, frameWarnings] = await evaluateOnPageWithErrorHandling(localPageInstance, generateEntireFrame, [animationMetadata, unitInfo.backgroundColor, i]);
+			} else {
+				// chunk by 20 or amount of frames such that max number of pixels updated this frame is less than threshold
+        let chunkSize = (maxNumberOfPixelsUpdatedExceedsThreshold && animationMetadata.partCountByFrameIndex[i] <= DEFAULT_PART_CHUNK_SIZE)
+          ? Math.max(Math.floor(animationMetadata.partCountByFrameIndex[i] * (MAX_PIXELS_UPDATED_PER_FRAME_THRESHOLD / estimatedPixelsUpdatedInCurrentFrame)), 1)
+          : DEFAULT_PART_CHUNK_SIZE;
+				logForFrame(`Calculated chunk size ${chunkSize}`);
+				/**
+				 * @type {Array<{ blob: string, delay: number, width: number, height: number }>}
+				 */
+				const intermediateBlobInfo = [];
+				let intermediateFrameWarnings = [];
+				let startingPartIndex = animationMetadata.partCountByFrameIndex[i] - 1; // parts are rendered in reverse order, so start from last index
+				while (startingPartIndex >= 0) {
+					const partRangeMessage = chunkSize > 1
+            ? `parts ${Math.max(startingPartIndex - (chunkSize - 1), 0)} to ${startingPartIndex}`
+            : `part ${startingPartIndex}`;
+					logForFrame(`Drawing ${partRangeMessage}`);
+					let [blobInfoForCurrentChunk, intermediateFrameWarnings] = await evaluateOnPageWithErrorHandling(localPageInstance, generatePartialFrame, [animationMetadata, i, startingPartIndex, chunkSize]);
+					if (intermediateFrameWarnings.length > 0) {
+						frameWarnings.push({
+							step: "generatePartialFrame",
+							partIndexRange: [startingPartIndex - chunkSize, startingPartIndex],
+							intermediateFrameWarnings,
+						});
+					}
+					intermediateBlobInfo.push(blobInfoForCurrentChunk);
+
+					// reset browser after every iteration
+          await refreshBrowserInstanceWithUnitInfo();
+          startingPartIndex -= chunkSize;
+				}
+				logForFrame(`Merging ${intermediateBlobInfo.length} intermediate frames`);
+				[blobInfoForFrame, intermediateFrameWarnings] = await evaluateOnPageWithErrorHandling(localPageInstance, mergePartialFrames, [intermediateBlobInfo, unitInfo.backgroundColor]);
+				if (intermediateFrameWarnings.length > 0) {
+					frameWarnings.push({
+						step: "mergePartialFrames",
+						intermediateFrameWarnings,
+					});
+				}
+			}
+
+			logForFrame(`Saving frame`, frameFilePath);
+			await base64BlobToFile(blobInfoForFrame.blob, frameFilePath);
+			if (frameWarnings.length > 0) {
+				warnings.push({
+					frameIndex: i,
+					warnings: frameWarnings,
+				});
+			}
+			pixelsRenderedInPageInstance += animationMetadata.width * animationMetadata.height;
+      if (pixelsRenderedInPageInstance > 25_000_000) {
+        await refreshBrowserInstanceWithUnitInfo();
+      }
+		}
+	}
 	return warnings;
 }
 
@@ -412,18 +715,19 @@ async function createAnimationsForUnit (unitInfo) {
 	if (initializationWarnings.length > 0) {
     warnings.push({ initializationWarnings });
   }
+	// all-or-nothing flag to more easily generate Godot animations
+	const makeIndividualFrames = argv.framesonly || animationMetadataEntries.some((animationMetadata) => {
+		const hasLargeCanvas = (animationMetadata.width * animationMetadata.height > 1_000_000) || (animationMetadata.width * animationMetadata.height * animationMetadata.numFrames > 100_000_000);
+		const hasManyParts = animationMetadata.partCountByFrameIndex.some((count) => count > 40);
+		return hasLargeCanvas || hasManyParts || animationMetadata.numFrames > 50;
+	})
 	await animationMetadataEntries.reduce((acc, animationMetadata) => {
 		return acc.then(async () => {
-			const hasLargeCanvas = (animationMetadata.width * animationMetadata.height > 1_000_000) || (animationMetadata.width * animationMetadata.height * animationMetadata.numFrames > 100_000_000);
-			const hasManyParts = animationMetadata.partCountByFrameIndex.some((count) => count > 40);
-			const useFfmpeg = argv.forceffmpeg || hasLargeCanvas || hasManyParts || animationMetadata.numFrames > 50;
-
 			const pageInstance = await getPageInstance();
-			const warningsForAnimation = await generateAnimationThroughPage(animationMetadata, unitInfo, pageInstance);
-			// const warningsForAnimation = await (!useFfmpeg
-      //   ? generateAnimationThroughPage(animationMetadata, unitInfo, pageInstance)
-      //   : generateAnimationThroughFfmpeg(animationMetadata, unitInfo) // TODO
-      // );
+			const warningsForAnimation = await (!makeIndividualFrames
+        ? generateAnimationSheet(animationMetadata, unitInfo, pageInstance)
+        : generateIndividualAnimationFrames(animationMetadata, unitInfo)
+      );
 			if (warningsForAnimation.length > 0) {
         warnings.push({
           animationMetadata,
@@ -448,8 +752,11 @@ async function createAnimationsForUnit (unitInfo) {
 	log(`Writing animation JSON to [${animationJsonPath}]`);
 	fs.writeFileSync(animationJsonPath, JSON.stringify(animationJsonEntries, null, '\t'), { encoding: 'utf8' });
 
-	// TODO: handle frame-based output
-	await generateGodotAnimationForSpritesheetOutput(unitInfo, animationMetadataEntries);
+	if (!makeIndividualFrames) {
+		await generateGodotAnimationForSpritesheetOutput(unitInfo, animationMetadataEntries);
+	} else {
+		await generateGodotAnimationForIndividualFrameOutput(unitInfo, animationMetadataEntries);
+	}
 	console.timeEnd('text file generation');
 
 	if (unitInfo.serverHref) {
