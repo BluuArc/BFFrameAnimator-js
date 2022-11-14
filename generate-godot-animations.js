@@ -23,6 +23,7 @@ const { getPageInstance: getPageInstanceInWrapper, closeConnection, refreshActiv
  * @property {string} backgroundColor
  * @property {string?} server
  * @property {string?} serverHref
+ * @property {string?} samJsonLocation
  */
 
 /**
@@ -552,7 +553,7 @@ async function generateIndividualAnimationFrames (animationMetadata, unitInfo) {
 			blob: blobAsBase64,
 			width: partialFrame.width,
 			height: partialFrame.height,
-			delay: Math.floor(originalFrame.dataset.delay / 60 * 1000),
+			delay: Math.floor(partialFrame.dataset.delay / 60 * 1000),
 		};
 	};
 	/**
@@ -693,11 +694,50 @@ async function getIllustrationsForUnit (unitInfo) {
 /**
  * @param {UnitInfo} unitInfo
  */
+async function getSamAssetsForUnit (unitInfo) {
+	if (!unitInfo.serverHref) {
+		console.warn(`[${unitInfo.id}] Skipping getting images. Must specify 'serverHref'.`);
+		return;
+	}
+
+	/**
+	 * @type {Buffer}
+	 */
+	const samJsonAsBuffer = await downloadFile(unitInfo.samJsonLocation);
+	const samJson = JSON.parse(samJsonAsBuffer.toString("utf8"));
+	const baseOutputPath = path.join(argv.gifpath, getSheetFolderNameForUnitInfo(unitInfo));
+	await samJson.mImageVector.reduce((acc, { mImageName: fileName }) => {
+		return acc.then(() => {
+			const serverPath = `${unitInfo.serverHref}unit_sam/unit_${unitInfo.id}/${fileName}`;
+			const outputPath = path.join(baseOutputPath, fileName);
+			console.log(`[${unitInfo.id}] Fetching image`, fileName);
+			return downloadFile(serverPath, outputPath);
+		});
+	}, Promise.resolve());
+
+	await getIllustrationsForUnit(unitInfo);
+
+	fs.writeFileSync(path.join(baseOutputPath, "sam_animation.json"), JSON.stringify(samJson, null, "\t"), "utf8");
+}
+
+/**
+ * @param {UnitInfo} unitInfo
+ */
 async function createAnimationsForUnit (unitInfo) {
 	const id = unitInfo.id;
 	const log = (...args) => console.log(`[${id}]`, ...args);
+	const warnings = [];
 
 	ensurePathExists(path.join(argv.gifpath, getSheetFolderNameForUnitInfo(unitInfo)));
+
+	const isSamUnit = !!unitInfo.samJsonLocation && (await canReachHref(unitInfo.samJsonLocation));
+	if (isSamUnit) {
+		log("Detected as SAM unit");
+		console.time('image fetching');
+		await getSamAssetsForUnit(unitInfo);
+		console.timeEnd('image fetching');
+		return warnings;
+	}
 
 	// the cgs property can be unset when using the simplified input
 	if (unitInfo.cgs && Object.keys(unitInfo.cgs).length === 0) {
@@ -711,7 +751,6 @@ async function createAnimationsForUnit (unitInfo) {
 
 	console.time('sheet generation');
 	log('Generating sheets', animationMetadataEntries);
-	const warnings = [];
 	if (initializationWarnings.length > 0) {
     warnings.push({ initializationWarnings });
   }
