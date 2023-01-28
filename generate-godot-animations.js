@@ -335,6 +335,58 @@ script = ExtResource( ${externalResources.findIndex((e) => e.path === `res://${g
  * @param {UnitInfo} unitInfo
  * @param {AnimationMetadata[]} animationMetadataEntries
  */
+function generateGodotAnimationFrameInfoForSpritesheetOutput(unitInfo, animationMetadataEntries) {
+	return animationMetadataEntries.map((animationMetadata) => {
+		const { width, height, numFrames, name, sheetMetadata } = animationMetadata;
+		const { horizontalFrameCount, gameOriginX, gameOriginY, delays } = sheetMetadata;
+		let xIndex = 0, yIndex = 0;
+		/**
+		 * @type {Array<[startX: number, startY: number, width: number, height: number]>}
+		 */
+		const individualFrames = [];
+		for (let i = 0; i < numFrames; ++i) {
+			individualFrames.push([xIndex * width, yIndex * height, width, height]);
+			xIndex++;
+			if (xIndex >= horizontalFrameCount) {
+				xIndex = 0;
+				yIndex++;
+			}
+		}
+		return {
+			name,
+			gameOrigin: [gameOriginX, gameOriginY],
+			delays,
+			type: "spritesheet",
+			filename: getSheetFileNameForUnitInfo(unitInfo, name),
+			frames: individualFrames,
+		};
+	});
+}
+
+/**
+ * @param {UnitInfo} unitInfo
+ * @param {AnimationMetadata[]} animationMetadataEntries
+ */
+function generateGodotAnimationFrameInfoForIndividualFrameOutput(unitInfo, animationMetadataEntries) {
+	return animationMetadataEntries.map((animationMetadata) => {
+		const { name, sheetMetadata } = animationMetadata;
+		const { gameOriginX, gameOriginY, delays } = sheetMetadata;
+		const frameOutputFolder = path.join(argv.gifpath, getSheetFolderNameForUnitInfo(unitInfo, name));
+		const frameFilenames = fs.readdirSync(frameOutputFolder).sort();
+		return {
+			name,
+			gameOrigin: [gameOriginX, gameOriginY],
+			delays,
+			type: "frames",
+			frames: frameFilenames,
+		};
+	});
+}
+
+/**
+ * @param {UnitInfo} unitInfo
+ * @param {AnimationMetadata[]} animationMetadataEntries
+ */
 function generateGodotAnimationForIndividualFrameOutput(unitInfo, animationMetadataEntries) {
 	const godotAssetFolderPath = replaceBackslashes(getSheetFolderNameForUnitInfo(unitInfo)).replace("assets-animations", "res://assets/animations");
 	const godotAnimationFolderPath = replaceBackslashes(getGodotAnimationFolderPathForUnitInfo(unitInfo));
@@ -778,11 +830,9 @@ async function createAnimationsForUnit (unitInfo) {
 	console.timeEnd('sheet generation');
 
 	console.time('text file generation');
-	const animationJsonEntries = animationMetadataEntries.map((animationMetadata) => ({
-		...animationMetadata.sheetMetadata,
-		name: animationMetadata.name,
-		filename: getSheetFileNameForUnitInfo(unitInfo, animationMetadata.name)
-	}));
+	const animationJsonEntries = makeIndividualFrames
+		? generateGodotAnimationFrameInfoForIndividualFrameOutput(unitInfo, animationMetadataEntries)
+		: generateGodotAnimationFrameInfoForSpritesheetOutput(unitInfo, animationMetadataEntries);
 	const animationJsonPath = path.join(
 		argv.gifpath,
 		getSheetFolderNameForUnitInfo(unitInfo),
@@ -791,11 +841,11 @@ async function createAnimationsForUnit (unitInfo) {
 	log(`Writing animation JSON to [${animationJsonPath}]`);
 	fs.writeFileSync(animationJsonPath, JSON.stringify(animationJsonEntries, null, '\t'), { encoding: 'utf8' });
 
-	if (!makeIndividualFrames) {
-		await generateGodotAnimationForSpritesheetOutput(unitInfo, animationMetadataEntries);
-	} else {
-		await generateGodotAnimationForIndividualFrameOutput(unitInfo, animationMetadataEntries);
-	}
+	// if (!makeIndividualFrames) {
+	// 	await generateGodotAnimationForSpritesheetOutput(unitInfo, animationMetadataEntries);
+	// } else {
+	// 	await generateGodotAnimationForIndividualFrameOutput(unitInfo, animationMetadataEntries);
+	// }
 	console.timeEnd('text file generation');
 
 	if (unitInfo.serverHref) {
