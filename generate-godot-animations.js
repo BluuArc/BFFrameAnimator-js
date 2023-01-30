@@ -24,6 +24,7 @@ const { getPageInstance: getPageInstanceInWrapper, closeConnection, refreshActiv
  * @property {string?} server
  * @property {string?} serverHref
  * @property {string?} samJsonLocation
+ * @property {string?} samFolderPath relative to server href
  */
 
 /**
@@ -760,16 +761,22 @@ async function getSamAssetsForUnit (unitInfo) {
 	const baseOutputPath = path.join(argv.gifpath, getSheetFolderNameForUnitInfo(unitInfo));
 	await samJson.mImageVector.reduce((acc, { mImageName: fileName }) => {
 		return acc.then(() => {
-			const serverPath = `${unitInfo.serverHref}unit_sam/unit_${unitInfo.id}/${fileName}`;
+			const serverPath = `${unitInfo.serverHref}${unitInfo.samFolderPath}${fileName}`;
 			const outputPath = path.join(baseOutputPath, fileName);
 			console.log(`[${unitInfo.id}] Fetching image`, fileName);
 			return downloadFile(serverPath, outputPath);
 		});
 	}, Promise.resolve());
 
-	await getIllustrationsForUnit(unitInfo);
+	if (unitInfo.type === "unit") {
+		await getIllustrationsForUnit(unitInfo);
+	}
 
-	fs.writeFileSync(path.join(baseOutputPath, "sam_animation.json"), JSON.stringify(samJson, null, "\t"), "utf8");
+	const animationJsonContents = {
+		type: "sam",
+		animation: samJson,
+	};
+	fs.writeFileSync(path.join(baseOutputPath, "animation.json"), JSON.stringify(animationJsonContents, null, "\t"), "utf8");
 }
 
 /**
@@ -830,7 +837,7 @@ async function createAnimationsForUnit (unitInfo) {
 	console.timeEnd('sheet generation');
 
 	console.time('text file generation');
-	const animationJsonEntries = makeIndividualFrames
+	const animationEntries = makeIndividualFrames
 		? generateGodotAnimationFrameInfoForIndividualFrameOutput(unitInfo, animationMetadataEntries)
 		: generateGodotAnimationFrameInfoForSpritesheetOutput(unitInfo, animationMetadataEntries);
 	const animationJsonPath = path.join(
@@ -839,7 +846,11 @@ async function createAnimationsForUnit (unitInfo) {
 		'animation.json',
 	);
 	log(`Writing animation JSON to [${animationJsonPath}]`);
-	fs.writeFileSync(animationJsonPath, JSON.stringify(animationJsonEntries, null, '\t'), { encoding: 'utf8' });
+	const animationJsonContents = {
+		type: 'csv', // differentiate from sam animations
+		animations: animationEntries,
+	};
+	fs.writeFileSync(animationJsonPath, JSON.stringify(animationJsonContents, null, '\t'), { encoding: 'utf8' });
 
 	// if (!makeIndividualFrames) {
 	// 	await generateGodotAnimationForSpritesheetOutput(unitInfo, animationMetadataEntries);
