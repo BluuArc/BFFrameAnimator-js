@@ -20,8 +20,10 @@ var App = (function () {
     });
   }
 
-  const calculateAnimationBounds = greenlet(function (cgsEntry = [], frames = [], doTrim = false) {
+  const calculateAnimationBounds = greenlet(function (cgsEntry = [], frames = [], doTrim = false, ignoreScaling = false) {
     let xMin = Infinity, yMin = Infinity, xMax = -Infinity, yMax = -Infinity;
+    const CANVAS_MAX_WIDTH = 8192;
+    const CANVAS_MAX_HEIGHT = 8192;
     cgsEntry.forEach(cgsFrame => {
       const frameData = frames[cgsFrame.frameIndex];
       const xOffset = Math.abs(cgsFrame.xOffset) || 0;
@@ -30,8 +32,17 @@ var App = (function () {
         const w = part.img.width, h = part.img.height;
         xMin = Math.min(xMin, part.position.x - (doTrim ? 0 : w) - xOffset);
         yMin = Math.min(yMin, part.position.y - (doTrim ? 0 : h) - yOffset);
-        xMax = Math.max(xMax, part.position.x + w + xOffset);
-        yMax = Math.max(yMax, part.position.y + h + yOffset);
+        let scaledWidth = w, scaledHeight = h;
+        const largestScaleX = Math.max(part.scaleX, Math.abs(part.scaleX));
+        if (!ignoreScaling && largestScaleX > 1) {
+          scaledWidth *= largestScaleX;
+        }
+        const largestScaleY = Math.max(part.scaleY, Math.abs(part.scaleY));
+        if (!ignoreScaling && largestScaleY > 1) {
+          scaledHeight *= largestScaleY;
+        }
+        xMax = Math.max(xMax, part.position.x + scaledWidth + xOffset);
+        yMax = Math.max(yMax, part.position.y + scaledHeight + yOffset);
       });
     });
     let left = 0, top = 0,
@@ -44,21 +55,31 @@ var App = (function () {
       left = -(xMax + xMin) / 2;
       top = -(yMax + yMin) / 2;
     }
-    return {
+    const hasPotentiallyBrokenScaling = width > CANVAS_MAX_WIDTH || height > CANVAS_MAX_HEIGHT;
+    const result = {
       x: [xMin, xMax],
       y: [yMin, yMax],
-      w: width,
-      h: height,
+      w: Math.min(width, CANVAS_MAX_WIDTH),
+      h: Math.min(height, CANVAS_MAX_HEIGHT),
+      ignoreScaling: ignoreScaling || hasPotentiallyBrokenScaling,
       offset: {
         left,
         top,
       },
     };
+    if (hasPotentiallyBrokenScaling) {
+      Object.assign(result, {
+        originalCalculatedWidth: width,
+        originalCalculatedHeight: height,
+      });
+    }
+    return result;
   });
   const TRANSPARENCY_COLOR = 'rgb(100, 100, 100)';
+  const tempCanvasesBySpritesheetCollection = new WeakMap();
   class FrameMaker {
-    constructor (cggCsv = []) {
-      this._frames = this._processCgg(cggCsv);
+    constructor (cggCsv = [], scalingInformationByFrameByPart = {}) {
+      this._frames = this._processCgg(cggCsv, scalingInformationByFrameByPart);
       this._animations = {};
     }
     _blobToBase64 (blob) {
@@ -150,17 +171,17 @@ var App = (function () {
           });
       });
       const maker = await FrameMaker._loadCsv(`/get/${encodeURIComponent(input.cgg)}`)
-        .then(csv => new FrameMaker(csv));
+        .then(csv => new FrameMaker(csv, input.scalingInformationByFrameByPart));
       await Promise.all(cgsPromises);
       for (const key in cgsCsv) {
-        await maker.addAnimation(key, cgsCsv[key], doTrim);
+        await maker.addAnimation(key, cgsCsv[key], doTrim, input.bounds);
       }
       return Promise.all(spritesheets).then(spritesheets => ({
         maker,
         spritesheets,
       }));
     }
-    _cggLineToEntry (frameLine = [], index = -1) {
+    _cggLineToEntry (frameLine = [], index = -1, scalingInformationByFrameByPart = {}) {
       const entry = {
         anchorType: +frameLine[0],
         partCount: +frameLine[1],
@@ -193,6 +214,10 @@ var App = (function () {
           },
           pageId: +frameLine[curIndex++],
         };
+        const scalingInfoKey = `${index}-${partCount}`;
+        if (scalingInformationByFrameByPart[scalingInfoKey]) {
+          Object.assign(part, scalingInformationByFrameByPart[scalingInfoKey]);
+        }
         if (partIsValid(part)) {
           partCount++;
           entry.parts.push(part);
@@ -202,10 +227,10 @@ var App = (function () {
       }
       return entry;
     }
-    _processCgg (cggCsv = []) {
+    _processCgg (cggCsv = [], scalingInformationByFrameByPart) {
       return cggCsv
         .filter(frame => frame.length >= 2)
-        .map((frame, i) => this._cggLineToEntry(frame, i));
+        .map((frame, i) => this._cggLineToEntry(frame, i, scalingInformationByFrameByPart));
     }
     _processCgs (cgsCsv = []) {
       return cgsCsv.map(frame => ({
@@ -221,17 +246,29 @@ var App = (function () {
         return isValid;
       });
     }
-    async addAnimation (key = 'name', csv = [], doTrim) {
+    async addAnimation (key = 'name', csv = [], doTrim, inputBounds) {
       const cgsFrames = this._processCgs(csv);
       const lowercaseKey = key.toLowerCase();
       const trim = doTrim === undefined ?
         (!lowercaseKey.includes('atk') && !lowercaseKey.includes('xbb')) :
         doTrim;
-      const bounds = await calculateAnimationBounds(
-        cgsFrames,
-        this._frames,
-        trim,
-      );
+      let bounds = inputBounds;
+      if (!inputBounds) {
+        bounds = await calculateAnimationBounds(
+          cgsFrames,
+          this._frames,
+          trim,
+        );
+        if (bounds.ignoreScaling) {
+          console.warn(`Recalculating bounds without scaling info due to potentially broken scaling information`, { originalBounds: bounds });
+          bounds = await calculateAnimationBounds(
+            cgsFrames,
+            this._frames,
+            trim,
+            true,
+          );
+        }
+      }
       this._animations[key] = {
         frames: cgsFrames,
         bounds,
@@ -269,6 +306,9 @@ var App = (function () {
       flipHorizontal = false,
       flipVertical = false,
       drawFrameBounds = false,
+      cacheNewCanvases = true,
+      startingPartIndex,
+      numberOfPartsToRender,
     }) {
       const animationEntry = this._animations[animationName];
       if (!animationEntry) {
@@ -280,10 +320,18 @@ var App = (function () {
       }
       const cgsFrame = animationEntry.frames[animationIndex];
       const cggFrame = this._frames[cgsFrame.frameIndex];
-      const tempCanvasSize = (spritesheets.reduce((acc, val) => Math.max(acc, val.width, val.height), Math.max(bounds.w + Math.abs(bounds.offset.left) * 2, bounds.h + Math.abs(bounds.offset.top) * 2)));
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = tempCanvasSize;
-      tempCanvas.height = tempCanvasSize;
+      let tempCanvas = tempCanvasesBySpritesheetCollection.get(spritesheets);
+      let tempCanvasSize = 0;
+      if (!tempCanvas) {
+        tempCanvasSize = (spritesheets.reduce((acc, val) => Math.max(acc, val.width, val.height), Math.max(bounds.w + Math.abs(bounds.offset.left) * 2, bounds.h + Math.abs(bounds.offset.top) * 2)));
+        tempCanvas = document.createElement('canvas');
+        tempCanvas.width = tempCanvasSize;
+        tempCanvas.height = tempCanvasSize;
+        tempCanvasesBySpritesheetCollection.set(spritesheets, tempCanvas);
+      } else {
+        tempCanvasSize = tempCanvas.width;
+        tempCanvas.getContext('2d').clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+      }
       const frameCanvas = document.createElement('canvas');
       if (referenceCanvas) {
         frameCanvas.width = referenceCanvas.width;
@@ -299,7 +347,9 @@ var App = (function () {
       };
       const tempContext = tempCanvas.getContext('2d');
       const frameContext = frameCanvas.getContext('2d');
-      for (let partIndex = cggFrame.parts.length - 1; partIndex >= 0; --partIndex) {
+      const startingIndex = typeof startingPartIndex === 'number' ? startingPartIndex : cggFrame.parts.length - 1;
+      const iterationEndIndex = Math.max(typeof numberOfPartsToRender === 'number' ? startingIndex - (numberOfPartsToRender - 1) : 0, 0);
+      for (let partIndex = startingIndex; partIndex >= iterationEndIndex; --partIndex) {
         const part = cggFrame.parts[partIndex];
         await waitForIdleFrame();
         try {
@@ -310,22 +360,36 @@ var App = (function () {
           const flipY = part.flipType === 2 || part.flipType === 3;
           let tempX = tempCanvas.width / 2 - sourceWidth / 2,
             tempY = tempCanvas.height / 2 - sourceHeight / 2;
-          if (flipX || flipY) {
-            tempContext.save();
-            tempContext.translate(flipX ? sourceWidth : 0, flipY ? sourceHeight : 0);
-            tempContext.scale(flipX ? -1 : 1, flipY ? -1 : 1);
-            tempX -= (flipX ? tempCanvas.width - sourceWidth : 0);
-            tempY -= (flipY ? tempCanvas.height - sourceHeight : 0);
+          const hasImageScaling = ('imageScaleX' in part || 'imageScaleY' in part) && !bounds.ignoreScaling;
+          const xImageScaling = hasImageScaling ? part.imageScaleX : 1;
+          const yImageScaling = hasImageScaling ? part.imageScaleY : 1;
+          tempContext.save();
+          if (hasImageScaling) {
+            tempContext.translate(tempX, tempY);
+            tempContext.scale(xImageScaling, yImageScaling);
+            tempContext.drawImage(
+              spritesheets[part.pageId],
+              part.img.x, part.img.y, sourceWidth, sourceHeight,
+              0, 0,
+              sourceWidth, sourceHeight,
+            );
+          } else {
+            if (flipX || flipY) {
+              tempContext.translate(flipX ? sourceWidth : 0, flipY ? sourceHeight : 0);
+              tempContext.scale(flipX ? -xImageScaling : xImageScaling, flipY ? -yImageScaling : yImageScaling);
+              tempX -= (flipX ? tempCanvas.width - sourceWidth : 0);
+              tempY -= (flipY ? tempCanvas.height - sourceHeight : 0);
+            } else {
+              tempContext.scale(xImageScaling, yImageScaling);
+            }
+            tempContext.drawImage(
+              spritesheets[part.pageId],
+              part.img.x, part.img.y, sourceWidth, sourceHeight,
+              tempX, tempY,
+              sourceWidth, sourceHeight,
+            );
           }
-          tempContext.drawImage(
-            spritesheets[part.pageId],
-            part.img.x, part.img.y, sourceWidth, sourceHeight,
-            tempX, tempY,
-            sourceWidth, sourceHeight,
-          );
-          if (flipX || flipY) {
-            tempContext.restore();
-          }
+          tempContext.restore();
           if (part.blendMode === 1) {
             const imgData = tempContext.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
             const pixelData = imgData.data;
@@ -350,15 +414,34 @@ var App = (function () {
             frameContext.rotate(-part.rotate * Math.PI / 180);
             frameContext.translate(-(origin.x + part.position.x + sourceWidth / 2 + bounds.offset.left), -(origin.y + part.position.y + sourceHeight / 2 + bounds.offset.top));
           }
-          frameContext.drawImage(
-            tempCanvas,
-            0, 0,
-            tempCanvas.width, tempCanvas.height,
-            targetX + bounds.offset.left, targetY + bounds.offset.top,
-            tempCanvas.width, tempCanvas.height,
-          );
-          if (part.rotate !== 0) {
+          const hasFrameScaling = ('frameScaleX' in part || 'frameScaleY' in part) && !bounds.ignoreScaling;
+          if (hasFrameScaling) {
+            if (part.rotate === 0) {
+              frameContext.save();
+            }
+            const xOffset = hasFrameScaling ? tempCanvas.width / 2 * (1 - part.frameScaleX) : 0;
+            const yOffset = hasFrameScaling ? tempCanvas.height / 2 * (1 - part.frameScaleY) : 0;
+            frameContext.translate(targetX + bounds.offset.left + xOffset, targetY + bounds.offset.top + yOffset);
+            frameContext.scale(part.frameScaleX, part.frameScaleY);
+            frameContext.drawImage(
+              tempCanvas,
+              0, 0,
+              tempCanvas.width, tempCanvas.height,
+              0, 0,
+              tempCanvas.width, tempCanvas.height,
+            );
             frameContext.restore();
+          } else {
+            frameContext.drawImage(
+              tempCanvas,
+              0, 0,
+              tempCanvas.width, tempCanvas.height,
+              targetX + bounds.offset.left, targetY + bounds.offset.top,
+              tempCanvas.width, tempCanvas.height,
+            );
+            if (part.rotate !== 0) {
+              frameContext.restore();
+            }
           }
         } catch (err) {
           console.warn('skipping part due to error', partIndex, part);
@@ -375,6 +458,7 @@ var App = (function () {
         flippedContext.drawImage(frameCanvas, 0, 0);
         frameContext.clearRect(0, 0, frameCanvas.width, frameCanvas.height);
         frameContext.drawImage(flippedCanvas, 0, 0);
+        flippedCanvas.remove();
       }
       if (drawFrameBounds) {
         console.debug('drawing frame bounds', bounds, origin);
@@ -397,8 +481,9 @@ var App = (function () {
         frameContext.stroke();
         frameContext.restore();
       }
-      cachedCanvases[animationIndex] = frameCanvas;
-      tempCanvas.remove();
+      if (cacheNewCanvases) {
+        cachedCanvases[animationIndex] = frameCanvas;
+      }
       return frameCanvas;
     }
     async drawFrame ({
@@ -478,6 +563,7 @@ var App = (function () {
       drawFrameBounds = false,
       GifClass,
       useTransparency = true,
+      cacheNewCanvases = true,
       onProgressUpdate,
       backgroundColor,
     }) {
@@ -495,8 +581,12 @@ var App = (function () {
       }
       animationEntry.gif = animationEntry.gif || {};
       if (!animationEntry.gif[backgroundColor]) {
+        const hasOnProgressUpdateFunction = typeof onProgressUpdate === 'function';
         const numFrames = animationEntry.frames.length;
         for (let i = 0; i < numFrames; ++i) {
+          if (hasOnProgressUpdateFunction) {
+            onProgressUpdate(+((i/numFrames/2).toFixed(2)));
+          }
           const originalFrame = await this.getFrame({
             spritesheets,
             animationName,
@@ -506,6 +596,7 @@ var App = (function () {
             flipHorizontal,
             flipVertical,
             drawFrameBounds,
+            cacheNewCanvases,
           });
           let frame;
           if (backgroundColor) {
@@ -517,8 +608,8 @@ var App = (function () {
           gif.addFrame(frame, { delay });
         }
         const blob = await new Promise((fulfill) => {
-          if (typeof onProgressUpdate === 'function') {
-            gif.on('progress', amt => onProgressUpdate(amt));
+          if (hasOnProgressUpdateFunction) {
+            gif.on('progress', amt => onProgressUpdate(amt / 2 + 0.5));
           }
           gif.on('finished', blob => fulfill(blob));
           gif.render();
@@ -830,6 +921,7 @@ var App = (function () {
             this._setProgress(undefined, Math.floor(amt * 100));
           },
           backgroundColor,
+          useTransparency: !backgroundColor,
         });
         this._vueData.animationUrls[animationName] = result.url;
         this._vueData.generatedColor = backgroundColor || this._vueData.activeBackgroundColor;

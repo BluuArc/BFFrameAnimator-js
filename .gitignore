@@ -3,3 +3,4 @@ node_modules/
 gifs/
 data/*
 !data/*.js
+temp
