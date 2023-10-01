@@ -670,6 +670,7 @@ var App = (function () {
       flipHorizontal = false,
       flipVertical = false,
       cacheNewCanvases = true,
+      outputFileType = "image/png",
       onProgressUpdate,
     }) {
       const animationEntry = this._animations[animationName];
@@ -715,13 +716,13 @@ var App = (function () {
         }
         const blob = await new Promise((resolve, reject) => {
           try {
-            outputCanvas.toBlob((localBlob) => resolve(localBlob));
+            outputCanvas.toBlob((localBlob) => resolve(localBlob), outputFileType);
           } catch (e) {
             reject(e);
           }
         });
         animationEntry.sheet = {
-          url: outputCanvas.toDataURL("image/png"),
+          url: outputCanvas.toDataURL(outputFileType),
           blob: await this._blobToBase64(blob),
           ...sheetMetadata,
         };

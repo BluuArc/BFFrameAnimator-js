@@ -104,7 +104,7 @@ function evaluateOnPageWithErrorHandling (pageInstance, evaluationFunction, func
 /**
  * @param {UnitInfo} unitInfo
  */
-const getFileNameForUnitInfoFrame = (unitInfo, cgsType, frameIndex, delay) => `${unitInfo.type || 'unit'}_${unitInfo.id}_${cgsType}${unitInfo.backgroundColor ? `_bg-${unitInfo.backgroundColor}` : ''}-F${String.prototype.padStart.call(`${frameIndex}`, 4, '0')}-${delay}.png`;
+const getFileNameForUnitInfoFrame = (unitInfo, cgsType, frameIndex, delay) => `${unitInfo.type || 'unit'}_${unitInfo.id}_${cgsType}${unitInfo.backgroundColor ? `_bg-${unitInfo.backgroundColor}` : ''}-F${String.prototype.padStart.call(`${frameIndex}`, 4, '0')}-${delay}.${argv.webp ? "webp" : "png"}`;
 /**
  * @param {UnitInfo} unitInfo
  * @param {string?} cgsType
@@ -118,7 +118,7 @@ const getSheetFolderNameForUnitInfo = (unitInfo, cgsType) => path.join(...[
  * @param {UnitInfo} unitInfo
  * @param {string} cgsType
  */
-const getSheetFileNameForUnitInfo = (unitInfo, cgsType) => `${unitInfo.type || 'unit'}_${unitInfo.id}_${cgsType}${unitInfo.backgroundColor ? `_bg-${unitInfo.backgroundColor}` : ''}.png`;
+const getSheetFileNameForUnitInfo = (unitInfo, cgsType) => `${unitInfo.type || 'unit'}_${unitInfo.id}_${cgsType}${unitInfo.backgroundColor ? `_bg-${unitInfo.backgroundColor}` : ''}.${argv.webp ? "webp" : "png"}`;
 /**
  * @param {UnitInfo} unitInfo
  * @param {string?} cgsType
@@ -490,7 +490,7 @@ script = ExtResource( ${externalResources.findIndex((e) => e.path === `res://${g
  */
 async function generateAnimationSheet (animationMetadata, unitInfo, pageInstance) {
 	console.log(`[${unitInfo.id}] Generating sprite sheet`);
-	const pageFunction = async ([animationName, backgroundColor]) => {
+	const pageFunction = async ([animationName, backgroundColor, outputWebP]) => {
 		console.log('generating sheet', { animationName, backgroundColor });
 		/**
 		 * @type {import("./js/app").default}
@@ -502,6 +502,7 @@ async function generateAnimationSheet (animationMetadata, unitInfo, pageInstance
 			backgroundColor,
 			useTransparency: !backgroundColor,
 			cacheNewCanvases: false,
+			outputFileType: outputWebP ?  "image/webp" : "image/png",
 			onProgressUpdate: (amt) => {
 				console.log(`[${animationName}] Creating sheet [${(amt * 100).toFixed(2)}%]`);
 			}
@@ -509,7 +510,7 @@ async function generateAnimationSheet (animationMetadata, unitInfo, pageInstance
 		console.log('finished generating sheet', result, animationName);
 		return result;
 	};
-	const [result, warnings] = await evaluateOnPageWithErrorHandling(pageInstance, pageFunction, [animationMetadata.name, unitInfo.backgroundColor]);
+	const [result, warnings] = await evaluateOnPageWithErrorHandling(pageInstance, pageFunction, [animationMetadata.name, unitInfo.backgroundColor, argv.webp]);
 	const outputPath = path.join(
 		argv.gifpath,
 		getSheetFolderNameForUnitInfo(unitInfo),
@@ -552,7 +553,7 @@ async function generateIndividualAnimationFrames (animationMetadata, unitInfo) {
 	/**
 	 * @param {[AnimationMetadata, string?, number]} args
 	 */
-	const generateEntireFrame = async ([pageMetadata, backgroundColor, frameIndex]) => {
+	const generateEntireFrame = async ([pageMetadata, backgroundColor, frameIndex, outputWebP]) => {
 		console.log('generating frame', pageMetadata, backgroundColor, frameIndex);
 		/**
 		 * @type {import("./js/app").default}
@@ -572,7 +573,7 @@ async function generateIndividualAnimationFrames (animationMetadata, unitInfo) {
 		 const blobAsBase64 = await new Promise((fulfill, reject) => {
 			resultFrame.toBlob((blob) => {
 				windowApp.frameMaker._blobToBase64(blob).then(fulfill, reject);
-			});
+			}, outputWebP ? "image/webp" : "image/png");
 		});
 		return {
 			blob: blobAsBase64,
@@ -582,7 +583,7 @@ async function generateIndividualAnimationFrames (animationMetadata, unitInfo) {
 	/**
 	 * @param {[AnimationMetadata, number, number, number]} args
 	 */
-	const generatePartialFrame = async ([pageMetadata, frameIndex, pagePartStartIndex, pagePartChunkSize]) => {
+	const generatePartialFrame = async ([pageMetadata, frameIndex, pagePartStartIndex, pagePartChunkSize, outputWebP]) => {
 		console.log('generating frame', pageMetadata, frameIndex);
 		/**
 		 * @type {import("./js/app").default}
@@ -600,7 +601,7 @@ async function generateIndividualAnimationFrames (animationMetadata, unitInfo) {
 		 const blobAsBase64 = await new Promise((fulfill, reject) => {
 			partialFrame.toBlob((blob) => {
 				windowApp.frameMaker._blobToBase64(blob).then(fulfill, reject);
-			});
+			}, outputWebP ? "image/webp" : "image/png");
 		});
 		return {
 			blob: blobAsBase64,
@@ -612,7 +613,7 @@ async function generateIndividualAnimationFrames (animationMetadata, unitInfo) {
 	/**
 	 * @param {[Array<{ blob: string, delay: number, width: number, height: number }>, string]} args
 	 */
-	const mergePartialFrames = async ([pageIntermediateBlobInfo, backgroundColor]) => {
+	const mergePartialFrames = async ([pageIntermediateBlobInfo, backgroundColor, outputWebP]) => {
 		console.log('generating frame', pageIntermediateBlobInfo, backgroundColor);
 		const resultFrame = document.createElement('canvas');
 		resultFrame.width = pageIntermediateBlobInfo[0].width;
@@ -628,7 +629,8 @@ async function generateIndividualAnimationFrames (animationMetadata, unitInfo) {
 				const image = new Image();
 				image.onload = () => fulfill(image);
 				image.onerror = image.onabort = reject;
-				image.src = `data:image/png;base64,${blobInfo.blob}`;
+				const fileType = outputWebP ? "image/webp" : "image/png"
+				image.src = `data:${fileType};base64,${blobInfo.blob}`;
 			});
 			resultFrameContext.drawImage(imageForIntermediateFrame, 0, 0);
 		}
@@ -640,7 +642,7 @@ async function generateIndividualAnimationFrames (animationMetadata, unitInfo) {
 				 */
 				const windowApp = window.app;
 				windowApp.frameMaker._blobToBase64(blob).then(fulfill, reject);
-			});
+			}, outputWebP ? "image/webp" : "image/png");
 		});
 
 		return {
@@ -663,7 +665,7 @@ async function generateIndividualAnimationFrames (animationMetadata, unitInfo) {
       const maxNumberOfPixelsUpdatedExceedsThreshold = estimatedPixelsUpdatedInCurrentFrame > MAX_PIXELS_UPDATED_PER_FRAME_THRESHOLD;
 			if (animationMetadata.partCountByFrameIndex[i] <= DEFAULT_PART_CHUNK_SIZE && !maxNumberOfPixelsUpdatedExceedsThreshold) {
 				// make entire frame in one go
-				[blobInfoForFrame, frameWarnings] = await evaluateOnPageWithErrorHandling(localPageInstance, generateEntireFrame, [animationMetadata, unitInfo.backgroundColor, i]);
+				[blobInfoForFrame, frameWarnings] = await evaluateOnPageWithErrorHandling(localPageInstance, generateEntireFrame, [animationMetadata, unitInfo.backgroundColor, i, argv.webp]);
 			} else {
 				// chunk by 20 or amount of frames such that max number of pixels updated this frame is less than threshold
         let chunkSize = (maxNumberOfPixelsUpdatedExceedsThreshold && animationMetadata.partCountByFrameIndex[i] <= DEFAULT_PART_CHUNK_SIZE)
@@ -681,7 +683,7 @@ async function generateIndividualAnimationFrames (animationMetadata, unitInfo) {
             ? `parts ${Math.max(startingPartIndex - (chunkSize - 1), 0)} to ${startingPartIndex}`
             : `part ${startingPartIndex}`;
 					logForFrame(`Drawing ${partRangeMessage}`);
-					let [blobInfoForCurrentChunk, intermediateFrameWarnings] = await evaluateOnPageWithErrorHandling(localPageInstance, generatePartialFrame, [animationMetadata, i, startingPartIndex, chunkSize]);
+					let [blobInfoForCurrentChunk, intermediateFrameWarnings] = await evaluateOnPageWithErrorHandling(localPageInstance, generatePartialFrame, [animationMetadata, i, startingPartIndex, chunkSize, argv.webp]);
 					if (intermediateFrameWarnings.length > 0) {
 						frameWarnings.push({
 							step: "generatePartialFrame",
@@ -696,7 +698,7 @@ async function generateIndividualAnimationFrames (animationMetadata, unitInfo) {
           startingPartIndex -= chunkSize;
 				}
 				logForFrame(`Merging ${intermediateBlobInfo.length} intermediate frames`);
-				[blobInfoForFrame, intermediateFrameWarnings] = await evaluateOnPageWithErrorHandling(localPageInstance, mergePartialFrames, [intermediateBlobInfo, unitInfo.backgroundColor]);
+				[blobInfoForFrame, intermediateFrameWarnings] = await evaluateOnPageWithErrorHandling(localPageInstance, mergePartialFrames, [intermediateBlobInfo, unitInfo.backgroundColor, argv.webp]);
 				if (intermediateFrameWarnings.length > 0) {
 					frameWarnings.push({
 						step: "mergePartialFrames",
