@@ -4,3 +4,5 @@ gifs/
 data/*
 !data/*.js
 temp
+report-errors-*.json
+report-warnings-*.json
