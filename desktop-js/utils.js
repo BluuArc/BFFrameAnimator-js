@@ -27,13 +27,17 @@ function downloadFile (href = '', filename = '') {
 	})
 		.then((data) => {
 			return new Promise((fulfill, reject) => {
-				fs.writeFile(filename, data, err => {
-					if (err) {
-						reject(err);
-					} else {
-						fulfill();
-					}
-				});
+				if (filename) {
+					fs.writeFile(filename, data, err => {
+						if (err) {
+							reject(err);
+						} else {
+							fulfill();
+						}
+					});
+				} else {
+					fulfill(data);
+				}
 			});
 		});
 }

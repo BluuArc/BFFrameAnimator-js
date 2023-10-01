@@ -730,17 +730,26 @@ async function getIllustrationsForUnit (unitInfo) {
 		console.warn(`[${unitInfo.id}] Skipping getting illustrations. Must specify 'serverHref'.`);
 		return;
 	}
+	const downloadIllustrationFromServer = (serverFileName, outputFileName) => {
+		const serverPath = `${unitInfo.serverHref}unit/img/${serverFileName}`;
+			const outputPath = path.join(argv.gifpath, getSheetFolderNameForUnitInfo(unitInfo), outputFileName);
+			console.log(`[${unitInfo.id}] Fetching image`, serverFileName);
+			return downloadFile(serverPath, outputPath);
+	};
 	await [
 		[`unit_ills_battle_${unitInfo.id}.png`, `unit_${unitInfo.id}_ills_battle.png`],
 		[`unit_ills_thum_${unitInfo.id}.png`, `unit_${unitInfo.id}_ills_thum.png`],
 		[`unit_ills_full_${unitInfo.id}.png`, `unit_${unitInfo.id}_ills_full.png`],
+	].reduce((acc, [serverFileName, outputFileName]) => acc.then(() => downloadIllustrationFromServer(serverFileName, outputFileName)), Promise.resolve());
+
+	await [
+		[`unit_ills_battle_${unitInfo.id}_2.png`, `unit_${unitInfo.id}_ills_battle_2.png`],
+		[`unit_ills_thum_${unitInfo.id}_2.png`, `unit_${unitInfo.id}_ills_thum_2.png`],
+		[`unit_ills_full_${unitInfo.id}_2.png`, `unit_${unitInfo.id}_ills_full_2.png`],
 	].reduce((acc, [serverFileName, outputFileName]) => {
-		return acc.then(() => {
-			const serverPath = `${unitInfo.serverHref}unit/img/${serverFileName}`;
-			const outputPath = path.join(argv.gifpath, getSheetFolderNameForUnitInfo(unitInfo), outputFileName);
-			console.log(`[${unitInfo.id}] Fetching image`, serverFileName);
-			return downloadFile(serverPath, outputPath);
-		});
+		return acc.then(() => downloadIllustrationFromServer(serverFileName, outputFileName)
+			.catch((err) => { console.log(`[${unitInfo.id}] Could not fetch alt art. Skipping due to error`, serverFileName, err); })
+		)
 	}, Promise.resolve());
 }
 
