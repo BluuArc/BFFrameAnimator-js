@@ -396,13 +396,10 @@ var App = (function () {
             const imgData = tempContext.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
             const pixelData = imgData.data;
             for (let p = 0; p < pixelData.length; p += 4) {
-              if (pixelData[p + 3] > 0) {
-                let [r, g, b, a] = [pixelData[p], pixelData[p + 1], pixelData[p + 2], pixelData[p + 3]];
-                const multiplier = 1 + (a * part.opacity / 100) / 255.0;
-                r = Math.min(255, Math.floor(r * multiplier));
-                g = Math.min(255, Math.floor(g * multiplier));
-                b = Math.min(255, Math.floor(b * multiplier));
-                a = Math.floor(((r + g + b) / 3) * part.opacity / 100);
+              let [r, g, b, a] = [pixelData[p], pixelData[p + 1], pixelData[p + 2], pixelData[p + 3]];
+              const colorAverage = (r + g + b) / 3;
+              if (a > 25 && colorAverage < 125) {
+                a = Math.floor(((r + g + b) / 3));
                 [pixelData[p], pixelData[p + 1], pixelData[p + 2], pixelData[p + 3]] = [r, g, b, a];
               }
             }
